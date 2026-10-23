@@ -9,9 +9,6 @@
     import javafx.scene.image.Image;
     import javafx.scene.image.ImageView;
     import javafx.scene.Group;
-    import javafx.scene.shape.Rectangle;
-    import javafx.scene.shape.Circle;
-    import javafx.scene.shape.Line;
     import java.lang.Math;
 
     public class Main extends Application {
@@ -28,11 +25,12 @@
         private boolean dDown = false;
         private long lastTime = 0;
         private double deltaTime;
+        private ImageView playerIdle;
 
         @Override
         public void start(Stage stage) {
             Pane root = new Pane();
-            root.setStyle("-fx-background-color: green;");
+            root.setStyle("-fx-background-color: #ffffff;");
             Scene scene = new Scene(root, 1280, 720);
 
             scene.setOnKeyPressed(event -> {
@@ -64,6 +62,35 @@
 
                     deltaTime =   (now - lastTime) / 1_000_000_000.0;
                     lastTime = now;
+
+                    double dx = 0;
+                    double dy = 0;
+                    double speed = 200;
+
+                    if (wDown) {
+                        dy -= 1;
+                    }
+                    if (sDown) {
+                        dy += 1;
+                    }
+                    if (aDown) {
+                        dx -= 1;
+                    }
+                    if (dDown) {
+                        dx += 1;
+                    }
+
+                    double movement = speed * deltaTime;
+
+                    double length = Math.sqrt(Math.pow(dx, 2) + Math.pow(dy, 2));
+
+                    if (length > 0) {
+                        dx /= length;
+                        dy /= length;
+                    }
+
+                    playerIdle.setX(playerIdle.getX() + dx * movement);
+                    playerIdle.setY(playerIdle.getY() + dy * movement);
                 }
             };
 
@@ -71,11 +98,23 @@
 
             Image logoImage = new Image(getClass().getResource("/logo.png").toExternalForm());
 
+            Image playerIdleImage = new Image(getClass().getResource("/playerIdle.png").toExternalForm());
+            playerIdle = new ImageView(playerIdleImage);
+
+            root.getChildren().add(playerIdle);
+            playerIdle.setX(scene.getWidth() / 2 - 24);
+            playerIdle.setY(scene.getHeight() / 2 - 24);
+            scale(playerIdle, 1);
+
             stage.setScene(scene);
             stage.setTitle("Mini GTA");
             stage.setResizable(false);
             stage.getIcons().add(logoImage);
             stage.show();
+        }
 
+        public static void scale(ImageView object, double ratio) {
+            object.setScaleX(ratio);
+            object.setScaleY(ratio);
         }
     }
