@@ -34,6 +34,12 @@ public class Main extends Application {
     private int buildingCount = 0;
     private static Rectangle playerHitbox = new Rectangle(18, 24, 18, 20);
 
+    private double playerWorldX;
+    private double playerWorldY;
+
+    private static double cameraX = 0;
+    private static double cameraY = 0;
+
     @Override
     public void start(Stage stage) {
         Pane root = new Pane();
@@ -92,38 +98,53 @@ public class Main extends Application {
                     dy /= length;
                 }
 
-                double newX = playerIdle.getX() + dx * movement;
-                double oldX = playerIdle.getX();
+                double newX = playerWorldX + dx * movement;
+                double oldX = playerWorldX;
 
-                playerIdle.setX(newX);
-                playerHitbox.setX(newX + 18);
+                playerWorldX = newX;
+                playerHitbox.setX(playerWorldX + 18);
 
                 for (Rectangle building : buildingHitbox) {
                     if (building != null &&
                             checkCollision(playerHitbox, building)) {
 
-                        playerIdle.setX(oldX);
-                        playerHitbox.setX(oldX + 18);
+                        playerWorldX = oldX;
+                        playerHitbox.setX(playerWorldX + 18);
                         break;
                     }
                 }
 
 
-                double newY = playerIdle.getY() + dy * movement;
-                double oldY = playerIdle.getY();
+                double newY = playerWorldY + dy * movement;
+                double oldY = playerWorldY;
 
-                playerIdle.setY(newY);
-                playerHitbox.setY(newY + 24);
+                playerWorldY = newY;
+                playerHitbox.setY(playerWorldY + 24);
 
-                for (Rectangle building : Main.this.buildingHitbox) {
+                for (Rectangle building : buildingHitbox) {
                     if (building != null &&
                             checkCollision(playerHitbox, building)) {
 
-                        playerIdle.setY(oldY);
-                        playerHitbox.setY(oldY + 24);
+                        playerWorldY = oldY;
+                        playerHitbox.setY(playerWorldY + 24);
                         break;
                     }
                 }
+
+                cameraX =  playerWorldX - scene.getWidth() / 2 + 24;
+                cameraY =  playerWorldY - scene.getHeight() / 2 + 24;
+
+                cameraX = Math.max(0, Math.min(cameraX, 768));
+                cameraY = Math.max(0, Math.min(cameraY, 816));
+
+                world.setTranslateX(-cameraX);
+                world.setTranslateY(-cameraY);
+
+                buildingOverlay.setTranslateX(-cameraX);
+                buildingOverlay.setTranslateY(-cameraY);
+
+                playerIdle.setX(playerWorldX - cameraX);
+                playerIdle.setY(playerWorldY - cameraY);
             }
         };
 
@@ -137,10 +158,15 @@ public class Main extends Application {
         playerIdle = new ImageView(playerIdleImage);
 
         root.getChildren().add(playerIdle);
-//          root.getChildren().add(playerHitbox);   // player's hitbox visibility
+//        root.getChildren().add(playerHitbox);   // player's hitbox visibility
         root.getChildren().add(buildingOverlay);
-        playerIdle.setX(scene.getWidth() / 2 - 24);
-        playerIdle.setY(scene.getHeight() / 2 - 24);
+
+        playerWorldX = scene.getWidth() / 2 - 24;
+        playerWorldY = scene.getHeight() / 2 - 24;
+
+        playerIdle.setX(playerWorldX);
+        playerIdle.setY(playerWorldY);
+
         scale(playerIdle, 1);
 
         Image grassImage = new Image(
@@ -149,8 +175,8 @@ public class Main extends Application {
         world.getTransforms().add(new Scale(2, 2, 0, 0));
         buildingOverlay.getTransforms().add(new Scale(2, 2, 0, 0));
 
-        for (int row = 0; row < 24; row++) {
-            for (int column = 0; column < 32; column++) {
+        for (int row = 0; row < 48;row++) {
+            for (int column = 0; column < 64; column++) {
                 Rectangle grassTile = new Rectangle(column * 16, row * 16, 16, 16);
                 grassTile.setFill(new ImagePattern(grassImage));
                 world.getChildren().add(grassTile);
