@@ -30,7 +30,7 @@ public class Main extends Application {
     private double deltaTime;
     private ImageView playerIdle;
 
-    private Rectangle[] buildingHitbox = new Rectangle[3];
+    private Rectangle[] buildingHitbox = new Rectangle[50];
     private int buildingCount = 0;
     private static Rectangle playerHitbox = new Rectangle(18, 24, 18, 20);
 
@@ -39,6 +39,15 @@ public class Main extends Application {
 
     private static double cameraX = 0;
     private static double cameraY = 0;
+
+    private static final int GRASS = 0;
+    private static final int ROAD_HORIZONTAL = 1;
+    private static final int ROAD_VERTICAL = 2;
+    private static final int SIDEWALK = 3;
+    private static final int INTERSECTION = 4;
+    private static final int BUILDING = 5;
+
+    private int[][] map = new int[48][64];
 
     @Override
     public void start(Stage stage) {
@@ -134,8 +143,11 @@ public class Main extends Application {
                 cameraX =  playerWorldX - scene.getWidth() / 2 + 24;
                 cameraY =  playerWorldY - scene.getHeight() / 2 + 24;
 
-                cameraX = Math.max(0, Math.min(cameraX, 768));
-                cameraY = Math.max(0, Math.min(cameraY, 816));
+                double worldWidth = map[0].length * 16 * 2;
+                double worldHeight = map.length * 16 * 2;
+
+                cameraX = Math.max(0, Math.min(cameraX, worldWidth - scene.getWidth()));
+                cameraY = Math.max(0, Math.min(cameraY, worldHeight - scene.getHeight()));
 
                 world.setTranslateX(-cameraX);
                 world.setTranslateY(-cameraY);
@@ -147,8 +159,6 @@ public class Main extends Application {
                 playerIdle.setY(playerWorldY - cameraY);
             }
         };
-
-        timer.start();
 
         Image logoImage = new Image(getClass().getResource("/logo.png").toExternalForm());
 
@@ -172,90 +182,21 @@ public class Main extends Application {
         Image grassImage = new Image(
                 getClass().getResource("/tiles/ground/grass.png").toExternalForm());
 
-        world.getTransforms().add(new Scale(2, 2, 0, 0));
-        buildingOverlay.getTransforms().add(new Scale(2, 2, 0, 0));
-
-        for (int row = 0; row < 48;row++) {
-            for (int column = 0; column < 64; column++) {
-                Rectangle grassTile = new Rectangle(column * 16, row * 16, 16, 16);
-                grassTile.setFill(new ImagePattern(grassImage));
-                world.getChildren().add(grassTile);
-            }
-        }
-
         Image roadHorizontalImage = new Image(
                 getClass().getResource("/tiles/roads/road_horizontal.png").toExternalForm()
         );
 
-        for (int column = 0; column < 32; column++) {
-            ImageView roadTile = new ImageView(roadHorizontalImage);
-            roadTile.setX(column * 16);
-            roadTile.setY(176);
-            roadTile.setFitWidth(16);
-            roadTile.setFitHeight(16);
-            world.getChildren().add(roadTile);
-        }
-
-
-        Image roadVerticalImage = new Image(
-                getClass().getResource("/tiles/roads/road_vertical.png").toExternalForm()
+        Image sideWalkImage = new Image(
+                getClass().getResource("/tiles/roads/sidewalk.png").toExternalForm()
         );
-
-        for (int row = 0; row < 24; row++) {
-            ImageView roadTile = new ImageView(roadVerticalImage);
-            roadTile.setX(256);
-            roadTile.setY(row * 16);
-            roadTile.setFitWidth(16);
-            roadTile.setFitHeight(16);
-            world.getChildren().add(roadTile);
-        }
-
 
         Image intersectionImage = new Image(
                 getClass().getResource("/tiles/roads/intersection.png").toExternalForm()
         );
 
-        ImageView intersection = new ImageView(intersectionImage);
-        intersection.setX(16 * 16);
-        intersection.setY(11 * 16);
-        intersection.setFitWidth(16);
-        intersection.setFitHeight(16);
-        world.getChildren().add(intersection);
-
-        Image sideWalkImage = new Image(
-                getClass().getResource("/tiles/roads/sidewalk.png").toExternalForm());
-
-        for (int column = 0; column < 32; column++) {
-            ImageView sideWalkTop = new ImageView(sideWalkImage);
-            sideWalkTop.setX(column * 16);
-            sideWalkTop.setY(160);
-            sideWalkTop.setFitWidth(16);
-            sideWalkTop.setFitHeight(16);
-            world.getChildren().add(sideWalkTop);
-
-            ImageView sideWalkBottom = new ImageView(sideWalkImage);
-            sideWalkBottom.setX(column * 16);
-            sideWalkBottom.setY(191);
-            sideWalkBottom.setFitWidth(16);
-            sideWalkBottom.setFitHeight(16);
-            world.getChildren().add(sideWalkBottom);
-        }
-
-        for (int row = 0; row < 24; row++) {
-            ImageView sideWalkLeft = new ImageView(sideWalkImage);
-            sideWalkLeft.setX(240);
-            sideWalkLeft.setY(row * 16);
-            sideWalkLeft.setFitWidth(16);
-            sideWalkLeft.setFitHeight(16);
-            world.getChildren().add(sideWalkLeft);
-
-            ImageView sideWalkRight = new ImageView(sideWalkImage);
-            sideWalkRight.setX(272);
-            sideWalkRight.setY(row * 16);
-            sideWalkRight.setFitWidth(16);
-            sideWalkRight.setFitHeight(16);
-            world.getChildren().add(sideWalkRight);
-        }
+        Image roadVerticalImage = new Image(
+                getClass().getResource("/tiles/roads/road_vertical.png").toExternalForm()
+        );
 
         Image roofImage = new Image(
                 getClass().getResource("/tiles/buildings/roof.png").toExternalForm()
@@ -265,15 +206,123 @@ public class Main extends Application {
                 getClass().getResource("/tiles/buildings/wall.png").toExternalForm()
         );
 
-        addBuilding(world, buildingOverlay, roofImage, wallImage, 5, 4);
-        addBuilding(world, buildingOverlay, roofImage, wallImage, 10, 4);
-        addBuilding(world, buildingOverlay, roofImage, wallImage, 20, 4);
+        world.getTransforms().add(new Scale(2, 2, 0, 0));
+        buildingOverlay.getTransforms().add(new Scale(2, 2, 0, 0));
+
+        for (int row = 0; row < map.length; row++) {
+            for (int column = 0; column < map[row].length; column++) {
+
+                boolean horizontalRoad = row >= 12 && row < 16
+                        || row >= 32 && row < 36;
+
+                boolean verticalRoad = column >= 20 && column < 24
+                        || column >= 44 && column < 48;
+
+                boolean horizontalSidewalk = row >= 10 && row < 12
+                        || row >= 16 && row < 18
+                        || row >= 30 && row < 32
+                        || row >= 36 && row < 38;
+
+                boolean verticalSidewalk = column >= 18 && column < 20
+                        || column >= 24 && column < 26
+                        || column >= 42 && column < 44
+                        || column >= 48 && column < 50;
+
+                boolean buildingArea =
+                        (row >= 4 && row < 8 && column >= 4 && column < 8)
+                                || (row >= 4 && row < 8 && column >= 12 && column < 16)
+                                || (row >= 4 && row < 8 && column >= 28 && column < 32)
+                                || (row >= 4 && row < 8 && column >= 36 && column < 40)
+
+                                || (row >= 22 && row < 26 && column >= 4 && column < 8)
+                                || (row >= 22 && row < 26 && column >= 12 && column < 16)
+                                || (row >= 22 && row < 26 && column >= 28 && column < 32)
+                                || (row >= 22 && row < 26 && column >= 36 && column < 40)
+
+                                || (row >= 40 && row < 44 && column >= 4 && column < 8)
+                                || (row >= 40 && row < 44 && column >= 12 && column < 16)
+                                || (row >= 40 && row < 44 && column >= 28 && column < 32)
+                                || (row >= 40 && row < 44 && column >= 36 && column < 40);
+
+                if (horizontalRoad && verticalRoad) {
+                    map[row][column] = INTERSECTION;
+                } else if (horizontalRoad) {
+                    map[row][column] = ROAD_HORIZONTAL;
+                } else if (verticalRoad) {
+                    map[row][column] = ROAD_VERTICAL;
+                } else if (horizontalSidewalk || verticalSidewalk) {
+                    map[row][column] = SIDEWALK;
+                } else if (buildingArea) {
+                    map[row][column] = BUILDING;
+                } else {
+                    map[row][column] = GRASS;
+                }
+            }
+        }
+
+        for (int row = 0; row < map.length; row++) {
+            for (int column = 0; column < map[row].length; column++) {
+                if (map[row][column] == GRASS) {
+                    Rectangle grassTile = new Rectangle(column * 16, row * 16, 16, 16);
+                    grassTile.setFill(new ImagePattern(grassImage));
+                    world.getChildren().add(grassTile);
+                }
+
+                if (map[row][column] == ROAD_HORIZONTAL) {
+
+                    ImageView roadTile = new ImageView(roadHorizontalImage);
+
+                    roadTile.setX(column * 16);
+                    roadTile.setY(row * 16);
+                    roadTile.setFitWidth(16);
+                    roadTile.setFitHeight(16);
+                    world.getChildren().add(roadTile);
+                }
+
+                if (map[row][column] == ROAD_VERTICAL) {
+
+                    ImageView roadTile = new ImageView(roadVerticalImage);
+
+                    roadTile.setX(column * 16);
+                    roadTile.setY(row * 16);
+                    roadTile.setFitWidth(16);
+                    roadTile.setFitHeight(16);
+                    world.getChildren().add(roadTile);
+                }
+
+                if (map[row][column] == SIDEWALK) {
+                    ImageView sideWalkTile = new ImageView(sideWalkImage);
+                    sideWalkTile.setX(column * 16);
+                    sideWalkTile.setY(row * 16);
+                    sideWalkTile.setFitWidth(16);
+                    sideWalkTile.setFitHeight(16);
+                    world.getChildren().add(sideWalkTile);
+                }
+
+                if (map[row][column] == INTERSECTION) {
+                    ImageView intersectionTile = new ImageView(intersectionImage);
+                    intersectionTile.setX(column * 16);
+                    intersectionTile.setY(row * 16);
+                    intersectionTile.setFitWidth(16);
+                    intersectionTile.setFitHeight(16);
+                    world.getChildren().add(intersectionTile);
+                }
+
+                if (map[row][column] == BUILDING
+                        && (row == 0 || map[row - 1][column] != BUILDING)
+                        && (column == 0 || map[row][column - 1] != BUILDING)) {
+                    addBuilding(world, buildingOverlay, roofImage, wallImage, column, row);
+                }
+            }
+        }
 
         stage.setScene(scene);
         stage.setTitle("Mini GTA");
         stage.setResizable(false);
         stage.getIcons().add(logoImage);
         stage.show();
+
+        timer.start();
     }
 
     public static void scale(ImageView object, double ratio) {
