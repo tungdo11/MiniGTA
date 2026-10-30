@@ -206,6 +206,18 @@ public class Main extends Application {
                 getClass().getResource("/tiles/buildings/wall.png").toExternalForm()
         );
 
+        Image treeImage = new Image(
+                getClass().getResource("/tiles/props/tree.png").toExternalForm()
+        );
+
+        Image streetlightImage = new Image(
+                getClass().getResource("/tiles/props/streetlight.png").toExternalForm()
+        );
+
+        Image hydrantImage = new Image(
+                getClass().getResource("/tiles/props/hydrant.png").toExternalForm()
+        );
+
         world.getTransforms().add(new Scale(2, 2, 0, 0));
         buildingOverlay.getTransforms().add(new Scale(2, 2, 0, 0));
 
@@ -229,20 +241,34 @@ public class Main extends Application {
                         || column >= 48 && column < 50;
 
                 boolean buildingArea =
+                        // Top-left district
                         (row >= 4 && row < 8 && column >= 4 && column < 8)
                                 || (row >= 4 && row < 8 && column >= 12 && column < 16)
+
+                                // Top-middle district
                                 || (row >= 4 && row < 8 && column >= 28 && column < 32)
                                 || (row >= 4 && row < 8 && column >= 36 && column < 40)
 
+                                // Top-right district
+                                || (row >= 4 && row < 8 && column >= 52 && column < 56)
+
+                                // Middle-left district
                                 || (row >= 22 && row < 26 && column >= 4 && column < 8)
                                 || (row >= 22 && row < 26 && column >= 12 && column < 16)
+
+                                // Middle-right district
                                 || (row >= 22 && row < 26 && column >= 28 && column < 32)
                                 || (row >= 22 && row < 26 && column >= 36 && column < 40)
+                                || (row >= 22 && row < 26 && column >= 52 && column < 56)
 
+                                // Bottom-left district
                                 || (row >= 40 && row < 44 && column >= 4 && column < 8)
                                 || (row >= 40 && row < 44 && column >= 12 && column < 16)
+
+                                // Bottom-right district
                                 || (row >= 40 && row < 44 && column >= 28 && column < 32)
-                                || (row >= 40 && row < 44 && column >= 36 && column < 40);
+                                || (row >= 40 && row < 44 && column >= 36 && column < 40)
+                                || (row >= 40 && row < 44 && column >= 52 && column < 56);
 
                 if (horizontalRoad && verticalRoad) {
                     map[row][column] = INTERSECTION;
@@ -316,6 +342,66 @@ public class Main extends Application {
             }
         }
 
+        // Trees
+        addProp(world, treeImage, 2, 2, 32, 32);
+        addProp(world, treeImage, 9, 9, 32, 32);
+        addProp(world, treeImage, 17, 6, 32, 32);
+        addProp(world, treeImage, 27, 9, 32, 32);
+        addProp(world, treeImage, 34, 5, 32, 32);
+        addProp(world, treeImage, 41, 9, 32, 32);
+        addProp(world, treeImage, 53, 9, 32, 32);
+        addProp(world, treeImage, 60, 5, 32, 32);
+
+        addProp(world, treeImage, 2, 27, 32, 32);
+        addProp(world, treeImage, 9, 29, 32, 32);
+        addProp(world, treeImage, 17, 25, 32, 32);
+        addProp(world, treeImage, 27, 28, 32, 32);
+        addProp(world, treeImage, 34, 27, 32, 32);
+        addProp(world, treeImage, 41, 24, 32, 32);
+        addProp(world, treeImage, 53, 28, 32, 32);
+        addProp(world, treeImage, 60, 24, 32, 32);
+
+        addProp(world, treeImage, 2, 46, 32, 32);
+        addProp(world, treeImage, 9, 42, 32, 32);
+        addProp(world, treeImage, 17, 46, 32, 32);
+        addProp(world, treeImage, 27, 47, 32, 32);
+        addProp(world, treeImage, 34, 45, 32, 32);
+        addProp(world, treeImage, 41, 47, 32, 32);
+        addProp(world, treeImage, 53, 46, 32, 32);
+        addProp(world, treeImage, 60, 42, 32, 32);
+
+        // Streetlights
+        addProp(world, streetlightImage, 18, 10, 16, 32);
+        addProp(world, streetlightImage, 24, 10, 16, 32);
+        addProp(world, streetlightImage, 42, 10, 16, 32);
+        addProp(world, streetlightImage, 48, 10, 16, 32);
+
+        addProp(world, streetlightImage, 18, 18, 16, 32);
+        addProp(world, streetlightImage, 24, 18, 16, 32);
+        addProp(world, streetlightImage, 42, 18, 16, 32);
+        addProp(world, streetlightImage, 48, 18, 16, 32);
+
+        addProp(world, streetlightImage, 18, 30, 16, 32);
+        addProp(world, streetlightImage, 24, 30, 16, 32);
+        addProp(world, streetlightImage, 42, 30, 16, 32);
+        addProp(world, streetlightImage, 48, 30, 16, 32);
+
+        addProp(world, streetlightImage, 18, 38, 16, 32);
+        addProp(world, streetlightImage, 24, 38, 16, 32);
+        addProp(world, streetlightImage, 42, 38, 16, 32);
+        addProp(world, streetlightImage, 48, 38, 16, 32);
+
+        // Hydrants
+        addProp(world, hydrantImage, 19, 11, 16, 16);
+        addProp(world, hydrantImage, 25, 17, 16, 16);
+        addProp(world, hydrantImage, 43, 11, 16, 16);
+        addProp(world, hydrantImage, 49, 17, 16, 16);
+
+        addProp(world, hydrantImage, 19, 31, 16, 16);
+        addProp(world, hydrantImage, 25, 37, 16, 16);
+        addProp(world, hydrantImage, 43, 31, 16, 16);
+        addProp(world, hydrantImage, 49, 37, 16, 16);
+
         stage.setScene(scene);
         stage.setTitle("Mini GTA");
         stage.setResizable(false);
@@ -333,6 +419,23 @@ public class Main extends Application {
     public static void scale(Group name, double ratio) {
         name.setScaleX(ratio);
         name.setScaleY(ratio);
+    }
+
+    public boolean checkCollision(Rectangle player, Rectangle building) {
+        double playerLeft = player.getX();
+        double playerRight = player.getX() + player.getWidth();
+        double playerTop = player.getY();
+        double playerBottom = player.getY() + player.getHeight();
+
+        double buildingLeft = building.getX();
+        double buildingRight = building.getX() + building.getWidth();
+        double buildingTop = building.getY();
+        double buildingBottom = building.getY() + building.getHeight();
+
+        return playerRight > buildingLeft
+                && playerLeft < buildingRight
+                && playerBottom > buildingTop
+                && playerTop < buildingBottom;
     }
 
     public void addBuilding(Group world, Group buildingOverlay, Image roofImage, Image wallImage, int startColumn, int startRow) {
@@ -371,20 +474,14 @@ public class Main extends Application {
         buildingCount++;
     }
 
-    public boolean checkCollision(Rectangle player, Rectangle building) {
-        double playerLeft = player.getX();
-        double playerRight = player.getX() + player.getWidth();
-        double playerTop = player.getY();
-        double playerBottom = player.getY() + player.getHeight();
+    public void addProp(Group world, Image image, int column, int row, int width, int height) {
+        ImageView prop = new ImageView(image);
 
-        double buildingLeft = building.getX();
-        double buildingRight = building.getX() + building.getWidth();
-        double buildingTop = building.getY();
-        double buildingBottom = building.getY() + building.getHeight();
+        prop.setX(column * 16 - width / 2);
+        prop.setY(row * 16 - height);
+        prop.setFitWidth(width);
+        prop.setFitHeight(height);
 
-        return playerRight > buildingLeft
-                && playerLeft < buildingRight
-                && playerBottom > buildingTop
-                && playerTop < buildingBottom;
+        world.getChildren().add(prop);
     }
 }
