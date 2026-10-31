@@ -32,7 +32,27 @@ public class Main extends Application {
 
     private Rectangle[] buildingHitbox = new Rectangle[50];
     private int buildingCount = 0;
-    private static Rectangle playerHitbox = new Rectangle(18, 24, 18, 20);
+
+    private static final double HITBOX_OFFSET_X = 8;
+    private static final double HITBOX_OFFSET_Y = 18;
+    private static final double HITBOX_WIDTH = 16;
+    private static final double HITBOX_HEIGHT = 18;
+
+    private static Rectangle playerHitbox =
+            new Rectangle(
+                    HITBOX_OFFSET_X,
+                    HITBOX_OFFSET_Y,
+                    HITBOX_WIDTH,
+                    HITBOX_HEIGHT
+            );
+
+    private static Rectangle playerHitboxVisual =
+            new Rectangle(
+                    HITBOX_OFFSET_X,
+                    HITBOX_OFFSET_Y,
+                    HITBOX_WIDTH,
+                    HITBOX_HEIGHT
+            );
 
     private double playerWorldX;
     private double playerWorldY;
@@ -48,6 +68,15 @@ public class Main extends Application {
     private static final int BUILDING = 5;
 
     private int[][] map = new int[48][64];
+
+    private ImageView player;
+
+    private Image playerUpIdle;
+    private Image playerDownIdle;
+    private Image playerLeftIdle;
+    private Image playerRightIdle;
+
+    private String playerDirection = "down";
 
     @Override
     public void start(Stage stage) {
@@ -98,6 +127,21 @@ public class Main extends Application {
                 if (aDown) dx--;
                 if (dDown) dx++;
 
+                if (wDown) playerDirection = "up";
+                if (sDown) playerDirection = "down";
+                if (dDown) playerDirection = "right";
+                if (aDown) playerDirection = "left";
+
+                if (playerDirection.equals("up")) {
+                    player.setImage(playerUpIdle);
+                } else if (playerDirection.equals("down")) {
+                    player.setImage(playerDownIdle);
+                } else if (playerDirection.equals("right")) {
+                    player.setImage(playerRightIdle);
+                } else if (playerDirection.equals("left")) {
+                    player.setImage(playerLeftIdle);
+                }
+
                 double movement = speed * deltaTime;
 
                 double length = Math.sqrt(Math.pow(dx, 2) + Math.pow(dy, 2));
@@ -111,14 +155,14 @@ public class Main extends Application {
                 double oldX = playerWorldX;
 
                 playerWorldX = newX;
-                playerHitbox.setX(playerWorldX + 18);
+                playerHitbox.setX(playerWorldX + HITBOX_OFFSET_X);
 
                 for (Rectangle building : buildingHitbox) {
                     if (building != null &&
                             checkCollision(playerHitbox, building)) {
 
                         playerWorldX = oldX;
-                        playerHitbox.setX(playerWorldX + 18);
+                        playerHitbox.setX(playerWorldX + 8);
                         break;
                     }
                 }
@@ -128,14 +172,14 @@ public class Main extends Application {
                 double oldY = playerWorldY;
 
                 playerWorldY = newY;
-                playerHitbox.setY(playerWorldY + 24);
+                playerHitbox.setY(playerWorldY + HITBOX_OFFSET_Y);
 
                 for (Rectangle building : buildingHitbox) {
                     if (building != null &&
                             checkCollision(playerHitbox, building)) {
 
                         playerWorldY = oldY;
-                        playerHitbox.setY(playerWorldY + 24);
+                        playerHitbox.setY(playerWorldY + 12);
                         break;
                     }
                 }
@@ -155,29 +199,18 @@ public class Main extends Application {
                 buildingOverlay.setTranslateX(-cameraX);
                 buildingOverlay.setTranslateY(-cameraY);
 
-                playerIdle.setX(playerWorldX - cameraX);
-                playerIdle.setY(playerWorldY - cameraY);
+                player.setX(playerWorldX + 8 - cameraX);
+                player.setY(playerWorldY + 12 - cameraY);
+
+                playerHitboxVisual.setX(playerWorldX + HITBOX_OFFSET_X - cameraX);
+                playerHitboxVisual.setY(playerWorldY + HITBOX_OFFSET_Y - cameraY);
             }
         };
 
         Image logoImage = new Image(getClass().getResource("/logo.png").toExternalForm());
 
-        Image playerIdleImage = new Image(
-                getClass().getResource("/playerIdle.png").toExternalForm()
-        );
-        playerIdle = new ImageView(playerIdleImage);
-
-        root.getChildren().add(playerIdle);
-//        root.getChildren().add(playerHitbox);   // player's hitbox visibility
-        root.getChildren().add(buildingOverlay);
-
         playerWorldX = scene.getWidth() / 2 - 24;
         playerWorldY = scene.getHeight() / 2 - 24;
-
-        playerIdle.setX(playerWorldX);
-        playerIdle.setY(playerWorldY);
-
-        scale(playerIdle, 1);
 
         Image grassImage = new Image(
                 getClass().getResource("/tiles/ground/grass.png").toExternalForm());
@@ -217,6 +250,37 @@ public class Main extends Application {
         Image hydrantImage = new Image(
                 getClass().getResource("/tiles/props/hydrant.png").toExternalForm()
         );
+
+        playerUpIdle = new Image(
+                getClass().getResource("/tiles/player/up/player_up_idle_1.png").toExternalForm()
+        );
+
+        playerDownIdle = new Image(
+                getClass().getResource("/tiles/player/down/player_down_idle_1.png").toExternalForm()
+        );
+
+        playerLeftIdle = new Image(
+                getClass().getResource("/tiles/player/left/player_left_idle_1.png").toExternalForm()
+        );
+
+        playerRightIdle = new Image(
+                getClass().getResource("/tiles/player/right/player_right_idle_1.png").toExternalForm()
+        );
+
+        player = new ImageView(playerDownIdle);
+        player.setSmooth(false);
+
+        root.getChildren().add(player);
+        root.getChildren().add(buildingOverlay);
+
+        // player's hitbox visuality
+//        playerHitboxVisual.setFill(javafx.scene.paint.Color.rgb(0, 0, 0, 1));
+//        root.getChildren().add(playerHitboxVisual);
+
+        player.setX(playerWorldX);
+        player.setY(playerWorldY);
+
+        scale(player, 2);
 
         world.getTransforms().add(new Scale(2, 2, 0, 0));
         buildingOverlay.getTransforms().add(new Scale(2, 2, 0, 0));
