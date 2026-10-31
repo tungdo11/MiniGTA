@@ -60,6 +60,9 @@ public class Main extends Application {
     private static double cameraX = 0;
     private static double cameraY = 0;
 
+    private int playerFrame = 0;
+    private double animationTimer = 0;
+
     private static final int GRASS = 0;
     private static final int ROAD_HORIZONTAL = 1;
     private static final int ROAD_VERTICAL = 2;
@@ -75,6 +78,11 @@ public class Main extends Application {
     private Image playerDownIdle;
     private Image playerLeftIdle;
     private Image playerRightIdle;
+
+    private Image[] playerUpWalk = new Image[5];
+    private Image[] playerDownWalk = new Image[5];
+    private Image[] playerLeftWalk = new Image[5];
+    private Image[] playerRightWalk = new Image[5];
 
     private String playerDirection = "down";
 
@@ -118,6 +126,7 @@ public class Main extends Application {
                 deltaTime = (now - lastTime) / 1_000_000_000.0;
                 lastTime = now;
 
+
                 double dx = 0;
                 double dy = 0;
                 double speed = 200;
@@ -126,6 +135,22 @@ public class Main extends Application {
                 if (sDown) dy++;
                 if (aDown) dx--;
                 if (dDown) dx++;
+
+                if (dx != 0 || dy != 0) {
+                    animationTimer += deltaTime;
+
+                    if (animationTimer >= 0.12) {
+                        playerFrame++;
+                        animationTimer = 0;
+
+                        if (playerFrame >= 5) {
+                            playerFrame = 0;
+                        }
+                    }
+                } else {
+                    playerFrame = 0;
+                    animationTimer = 0;
+                }
 
                 if (dx != 0 || dy != 0) {
                     if (Math.abs(dx) > Math.abs(dy)) {
@@ -143,14 +168,26 @@ public class Main extends Application {
                     }
                 }
 
-                if (playerDirection.equals("up")) {
-                    player.setImage(playerUpIdle);
-                } else if (playerDirection.equals("down")) {
-                    player.setImage(playerDownIdle);
-                } else if (playerDirection.equals("right")) {
-                    player.setImage(playerRightIdle);
-                } else if (playerDirection.equals("left")) {
-                    player.setImage(playerLeftIdle);
+                if (dx != 0 || dy != 0) {
+                    if (playerDirection.equals("up")) {
+                        player.setImage(playerUpWalk[playerFrame]);
+                    } else if (playerDirection.equals("down")) {
+                        player.setImage(playerDownWalk[playerFrame]);
+                    } else if (playerDirection.equals("right")) {
+                        player.setImage(playerRightWalk[playerFrame]);
+                    } else if (playerDirection.equals("left")) {
+                        player.setImage(playerLeftWalk[playerFrame]);
+                    }
+                } else {
+                    if (playerDirection.equals("up")) {
+                        player.setImage(playerUpIdle);
+                    } else if (playerDirection.equals("down")) {
+                        player.setImage(playerDownIdle);
+                    } else if (playerDirection.equals("right")) {
+                        player.setImage(playerRightIdle);
+                    } else if (playerDirection.equals("left")) {
+                        player.setImage(playerLeftIdle);
+                    }
                 }
 
                 double movement = speed * deltaTime;
@@ -277,6 +314,24 @@ public class Main extends Application {
         playerRightIdle = new Image(
                 getClass().getResource("/tiles/player/right/player_right_idle_1.png").toExternalForm()
         );
+
+        for (int i = 0; i < 5; i++) {
+            playerUpWalk[i] = new Image(
+                    getClass().getResource("/tiles/player/up/player_up_walk_" + (i + 1) + ".png").toExternalForm()
+            );
+
+            playerDownWalk[i] = new Image(
+                    getClass().getResource("/tiles/player/down/player_down_walk_" + (i + 1) + ".png").toExternalForm()
+            );
+
+            playerLeftWalk[i] = new Image(
+                    getClass().getResource("/tiles/player/left/player_left_walk_" + (i + 1) + ".png").toExternalForm()
+            );
+
+            playerRightWalk[i] = new Image(
+                    getClass().getResource("/tiles/player/right/player_right_walk_" + (i + 1) + ".png").toExternalForm()
+            );
+        }
 
         player = new ImageView(playerDownIdle);
         player.setSmooth(false);
