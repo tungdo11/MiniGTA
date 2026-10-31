@@ -127,10 +127,21 @@ public class Main extends Application {
                 if (aDown) dx--;
                 if (dDown) dx++;
 
-                if (wDown) playerDirection = "up";
-                if (sDown) playerDirection = "down";
-                if (dDown) playerDirection = "right";
-                if (aDown) playerDirection = "left";
+                if (dx != 0 || dy != 0) {
+                    if (Math.abs(dx) > Math.abs(dy)) {
+                        if (dx > 0) {
+                            playerDirection = "right";
+                        } else {
+                            playerDirection = "left";
+                        }
+                    } else {
+                        if (dy > 0) {
+                            playerDirection = "down";
+                        } else {
+                            playerDirection = "up";
+                        }
+                    }
+                }
 
                 if (playerDirection.equals("up")) {
                     player.setImage(playerUpIdle);
