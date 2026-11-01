@@ -86,6 +86,28 @@ public class Main extends Application {
 
     private String playerDirection = "down";
 
+    private ImageView npc;
+
+    private double npcWorldX;
+    private double npcWorldY;
+
+    private double npcSpeed = 80;
+
+    private int npcFrame = 0;
+    private double npcAnimationTimer = 0;
+
+    private String npcDirection = "right";
+
+    private Image npcUpIdle;
+    private Image npcDownIdle;
+    private Image npcLeftIdle;
+    private Image npcRightIdle;
+
+    private Image[] npcUpWalk = new Image[4];
+    private Image[] npcDownWalk = new Image[4];
+    private Image[] npcLeftWalk = new Image[4];
+    private Image[] npcRightWalk = new Image[4];
+
     @Override
     public void start(Stage stage) {
         Pane root = new Pane();
@@ -252,6 +274,42 @@ public class Main extends Application {
 
                 playerHitboxVisual.setX(playerWorldX + HITBOX_OFFSET_X - cameraX);
                 playerHitboxVisual.setY(playerWorldY + HITBOX_OFFSET_Y - cameraY);
+
+                npc.setX(npcWorldX - cameraX);
+                npc.setY(npcWorldY - cameraY);
+
+                double npcMovement = npcSpeed * deltaTime;
+
+                if (npcDirection.equals("right")) {
+                    npcWorldX += npcMovement;
+
+                    if (npcWorldX >= 35 * 16) {
+                        npcDirection = "left";
+                    }
+                } else if (npcDirection.equals("left")) {
+                    npcWorldX -= npcMovement;
+
+                    if (npcWorldX <= 30 * 16) {
+                        npcDirection = "right";
+                    }
+                }
+
+                npcAnimationTimer += deltaTime;
+
+                if (npcAnimationTimer >= 0.12) {
+                    npcFrame++;
+                    npcAnimationTimer = 0;
+
+                    if (npcFrame >= 4) {
+                        npcFrame = 0;
+                    }
+                }
+
+                if (npcDirection.equals("right")) {
+                    npc.setImage(npcRightWalk[npcFrame]);
+                } else if (npcDirection.equals("left")) {
+                    npc.setImage(npcLeftWalk[npcFrame]);
+                }
             }
         };
 
@@ -259,6 +317,9 @@ public class Main extends Application {
 
         playerWorldX = scene.getWidth() / 2 - 24;
         playerWorldY = scene.getHeight() / 2 - 24;
+
+        npcWorldX = 30 * 16;
+        npcWorldY = 20 * 16;
 
         Image grassImage = new Image(
                 getClass().getResource("/tiles/ground/grass.png").toExternalForm());
@@ -300,43 +361,81 @@ public class Main extends Application {
         );
 
         playerUpIdle = new Image(
-                getClass().getResource("/tiles/player/up/player_up_idle_1.png").toExternalForm()
+                getClass().getResource("/tiles/characters/player/up/player_up_idle_1.png").toExternalForm()
         );
 
         playerDownIdle = new Image(
-                getClass().getResource("/tiles/player/down/player_down_idle_1.png").toExternalForm()
+                getClass().getResource("/tiles/characters/player/down/player_down_idle_1.png").toExternalForm()
         );
 
         playerLeftIdle = new Image(
-                getClass().getResource("/tiles/player/left/player_left_idle_1.png").toExternalForm()
+                getClass().getResource("/tiles/characters/player/left/player_left_idle_1.png").toExternalForm()
         );
 
         playerRightIdle = new Image(
-                getClass().getResource("/tiles/player/right/player_right_idle_1.png").toExternalForm()
+                getClass().getResource("/tiles/characters/player/right/player_right_idle_1.png").toExternalForm()
         );
 
         for (int i = 0; i < 5; i++) {
             playerUpWalk[i] = new Image(
-                    getClass().getResource("/tiles/player/up/player_up_walk_" + (i + 1) + ".png").toExternalForm()
+                    getClass().getResource("/tiles/characters/player/up/player_up_walk_" + (i + 1) + ".png").toExternalForm()
             );
 
             playerDownWalk[i] = new Image(
-                    getClass().getResource("/tiles/player/down/player_down_walk_" + (i + 1) + ".png").toExternalForm()
+                    getClass().getResource("/tiles/characters/player/down/player_down_walk_" + (i + 1) + ".png").toExternalForm()
             );
 
             playerLeftWalk[i] = new Image(
-                    getClass().getResource("/tiles/player/left/player_left_walk_" + (i + 1) + ".png").toExternalForm()
+                    getClass().getResource("/tiles/characters/player/left/player_left_walk_" + (i + 1) + ".png").toExternalForm()
             );
 
             playerRightWalk[i] = new Image(
-                    getClass().getResource("/tiles/player/right/player_right_walk_" + (i + 1) + ".png").toExternalForm()
+                    getClass().getResource("/tiles/characters/player/right/player_right_walk_" + (i + 1) + ".png").toExternalForm()
+            );
+        }
+
+        npcUpIdle = new Image(
+                getClass().getResource("/tiles/characters/npc/civilian/up/civilian_up_idle_1.png").toExternalForm()
+        );
+
+        npcDownIdle = new Image(
+                getClass().getResource("/tiles/characters/npc/civilian/down/civilian_down_idle_1.png").toExternalForm()
+        );
+
+        npcLeftIdle = new Image(
+                getClass().getResource("/tiles/characters/npc/civilian/left/civilian_left_idle_1.png").toExternalForm()
+        );
+
+        npcRightIdle = new Image(
+                getClass().getResource("/tiles/characters/npc/civilian/right/civilian_right_idle_1.png").toExternalForm()
+        );
+
+        for (int i = 0; i < 4; i++) {
+            npcUpWalk[i] = new Image(
+                    getClass().getResource("/tiles/characters/npc/civilian/up/civilian_up_walk_" + (i + 1) + ".png").toExternalForm()
+            );
+
+            npcDownWalk[i] = new Image(
+                    getClass().getResource("/tiles/characters/npc/civilian/down/civilian_down_walk_" + (i + 1) + ".png").toExternalForm()
+            );
+
+            npcLeftWalk[i] = new Image(
+                    getClass().getResource("/tiles/characters/npc/civilian/left/civilian_left_walk_" + (i + 1) + ".png").toExternalForm()
+            );
+
+            npcRightWalk[i] = new Image(
+                    getClass().getResource("/tiles/characters/npc/civilian/right/civilian_right_walk_" + (i + 1) + ".png").toExternalForm()
             );
         }
 
         player = new ImageView(playerDownIdle);
         player.setSmooth(false);
 
+        npc = new ImageView(npcDownIdle);
+        npc.setSmooth(false);
+
         root.getChildren().add(player);
+        root.getChildren().add(npc);
         root.getChildren().add(buildingOverlay);
 
         // player's hitbox visuality
@@ -346,7 +445,11 @@ public class Main extends Application {
         player.setX(playerWorldX);
         player.setY(playerWorldY);
 
+        npc.setX(npcWorldX);
+        npc.setY(npcWorldY);
+
         scale(player, 2);
+        scale(npc, 2);
 
         world.getTransforms().add(new Scale(2, 2, 0, 0));
         buildingOverlay.getTransforms().add(new Scale(2, 2, 0, 0));
