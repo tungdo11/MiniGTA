@@ -54,14 +54,10 @@ public class Main extends Application {
                     HITBOX_HEIGHT
             );
 
-    private double playerWorldX;
-    private double playerWorldY;
+    private Player playerObject;
 
     private static double cameraX = 0;
     private static double cameraY = 0;
-
-    private int playerFrame = 0;
-    private double animationTimer = 0;
 
     private static final int GRASS = 0;
     private static final int ROAD_HORIZONTAL = 1;
@@ -83,8 +79,6 @@ public class Main extends Application {
     private Image[] playerDownWalk = new Image[5];
     private Image[] playerLeftWalk = new Image[5];
     private Image[] playerRightWalk = new Image[5];
-
-    private String playerDirection = "down";
 
     private ImageView npc;
     private NPC npcObject;
@@ -149,61 +143,34 @@ public class Main extends Application {
                 if (aDown) dx--;
                 if (dDown) dx++;
 
+                playerObject.updateDirection(dx, dy);
+
+                playerObject.animate(deltaTime, dx != 0 || dy != 0);
+
+
                 if (dx != 0 || dy != 0) {
-                    animationTimer += deltaTime;
-
-                    if (animationTimer >= 0.12) {
-                        playerFrame++;
-                        animationTimer = 0;
-
-                        if (playerFrame >= 5) {
-                            playerFrame = 0;
-                        }
+                    if (playerObject.getDirection().equals("up")) {
+                        player.setImage(playerUpWalk[playerObject.getFrame()]);
+                    } else if (playerObject.getDirection().equals("down")) {
+                        player.setImage(playerDownWalk[playerObject.getFrame()]);
+                    } else if (playerObject.getDirection().equals("right")) {
+                        player.setImage(playerRightWalk[playerObject.getFrame()]);
+                    } else if (playerObject.getDirection().equals("left")) {
+                        player.setImage(playerLeftWalk[playerObject.getFrame()]);
                     }
                 } else {
-                    playerFrame = 0;
-                    animationTimer = 0;
-                }
-
-                if (dx != 0 || dy != 0) {
-                    if (Math.abs(dx) > Math.abs(dy)) {
-                        if (dx > 0) {
-                            playerDirection = "right";
-                        } else {
-                            playerDirection = "left";
-                        }
-                    } else {
-                        if (dy > 0) {
-                            playerDirection = "down";
-                        } else {
-                            playerDirection = "up";
-                        }
-                    }
-                }
-
-                if (dx != 0 || dy != 0) {
-                    if (playerDirection.equals("up")) {
-                        player.setImage(playerUpWalk[playerFrame]);
-                    } else if (playerDirection.equals("down")) {
-                        player.setImage(playerDownWalk[playerFrame]);
-                    } else if (playerDirection.equals("right")) {
-                        player.setImage(playerRightWalk[playerFrame]);
-                    } else if (playerDirection.equals("left")) {
-                        player.setImage(playerLeftWalk[playerFrame]);
-                    }
-                } else {
-                    if (playerDirection.equals("up")) {
+                    if (playerObject.getDirection().equals("up")) {
                         player.setImage(playerUpIdle);
-                    } else if (playerDirection.equals("down")) {
+                    } else if (playerObject.getDirection().equals("down")) {
                         player.setImage(playerDownIdle);
-                    } else if (playerDirection.equals("right")) {
+                    } else if (playerObject.getDirection().equals("right")) {
                         player.setImage(playerRightIdle);
-                    } else if (playerDirection.equals("left")) {
+                    } else if (playerObject.getDirection().equals("left")) {
                         player.setImage(playerLeftIdle);
                     }
                 }
 
-                double movement = speed * deltaTime;
+                double movement = 200 * deltaTime;
 
                 double length = Math.sqrt(Math.pow(dx, 2) + Math.pow(dy, 2));
 
@@ -212,41 +179,39 @@ public class Main extends Application {
                     dy /= length;
                 }
 
-                double newX = playerWorldX + dx * movement;
-                double oldX = playerWorldX;
+                double oldX = playerObject.getWorldX();
 
-                playerWorldX = newX;
-                playerHitbox.setX(playerWorldX + HITBOX_OFFSET_X);
-
-                for (Rectangle building : buildingHitbox) {
-                    if (building != null &&
-                            checkCollision(playerHitbox, building)) {
-
-                        playerWorldX = oldX;
-                        playerHitbox.setX(playerWorldX + 8);
-                        break;
-                    }
-                }
-
-
-                double newY = playerWorldY + dy * movement;
-                double oldY = playerWorldY;
-
-                playerWorldY = newY;
-                playerHitbox.setY(playerWorldY + HITBOX_OFFSET_Y);
+                playerObject.moveX(dx * movement);
+                playerHitbox.setX(playerObject.getWorldX() + HITBOX_OFFSET_X);
 
                 for (Rectangle building : buildingHitbox) {
                     if (building != null &&
                             checkCollision(playerHitbox, building)) {
 
-                        playerWorldY = oldY;
-                        playerHitbox.setY(playerWorldY + 12);
+                        playerObject.setWorldX(oldX);
+                        playerHitbox.setX(playerObject.getWorldX() + HITBOX_OFFSET_X);
                         break;
                     }
                 }
 
-                cameraX =  playerWorldX - scene.getWidth() / 2 + 24;
-                cameraY =  playerWorldY - scene.getHeight() / 2 + 24;
+                double oldY = playerObject.getWorldY();
+
+                playerObject.moveY(dy * movement);
+
+                playerHitbox.setY(playerObject.getWorldY() + HITBOX_OFFSET_Y);
+
+                for (Rectangle building : buildingHitbox) {
+                    if (building != null &&
+                            checkCollision(playerHitbox, building)) {
+
+                        playerObject.setWorldY(oldY);
+                        playerHitbox.setY(playerObject.getWorldY() + HITBOX_OFFSET_Y);
+                        break;
+                    }
+                }
+
+                cameraX = playerObject.getWorldX() - scene.getWidth() / 2 + 24;
+                cameraY = playerObject.getWorldY() - scene.getHeight() / 2 + 24;
 
                 double worldWidth = map[0].length * 16 * 2;
                 double worldHeight = map.length * 16 * 2;
@@ -260,11 +225,11 @@ public class Main extends Application {
                 buildingOverlay.setTranslateX(-cameraX);
                 buildingOverlay.setTranslateY(-cameraY);
 
-                player.setX(playerWorldX + 8 - cameraX);
-                player.setY(playerWorldY + 12 - cameraY);
+                player.setX(playerObject.getWorldX() + 8 - cameraX);
+                player.setY(playerObject.getWorldY() + 12 - cameraY);
 
-                playerHitboxVisual.setX(playerWorldX + HITBOX_OFFSET_X - cameraX);
-                playerHitboxVisual.setY(playerWorldY + HITBOX_OFFSET_Y - cameraY);
+                playerHitboxVisual.setX(playerObject.getWorldX() + HITBOX_OFFSET_X - cameraX);
+                playerHitboxVisual.setY(playerObject.getWorldY() + HITBOX_OFFSET_Y - cameraY);
 
                 npc.setX(npcObject.getWorldX() - cameraX);
                 npc.setY(npcObject.getWorldY() - cameraY);
@@ -283,8 +248,11 @@ public class Main extends Application {
 
         Image logoImage = new Image(getClass().getResource("/logo.png").toExternalForm());
 
-        playerWorldX = scene.getWidth() / 2 - 24;
-        playerWorldY = scene.getHeight() / 2 - 24;
+        playerObject = new Player(
+                scene.getWidth() / 2 - 24,
+                scene.getHeight() / 2 - 24,
+                200
+        );
 
         npcObject = new NPC(30 * 16, 20 * 16, 80);
 
@@ -409,8 +377,8 @@ public class Main extends Application {
 //        playerHitboxVisual.setFill(javafx.scene.paint.Color.rgb(0, 0, 0, 1));
 //        root.getChildren().add(playerHitboxVisual);
 
-        player.setX(playerWorldX);
-        player.setY(playerWorldY);
+        player.setX(playerObject.getWorldX());
+        player.setY(playerObject.getWorldY());
 
         npc.setX(npcObject.getWorldX());
         npc.setY(npcObject.getWorldY());
