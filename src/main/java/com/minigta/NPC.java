@@ -6,15 +6,30 @@ public class NPC {
     private double worldY;
     private double speed;
     private String direction;
+    private String movementType;
 
     private int frame;
     private double animationTimer;
 
-    public NPC(double worldX, double worldY, double speed) {
+    private double patrolStart;
+    private double patrolEnd;
+
+    public NPC(double worldX, double worldY, double speed,
+               double patrolStart, double patrolEnd, String movementType) {
         this.worldX = worldX;
         this.worldY = worldY;
         this.speed = speed;
-        this.direction = "right";
+        this.patrolStart = patrolStart;
+        this.patrolEnd = patrolEnd;
+        this.movementType = movementType;
+
+        if (movementType.equals("vertical")) {
+            this.direction = "down";
+        } else {
+            this.direction = "right";
+        }
+
+        this.frame = 0;
         this.frame = 0;
         this.animationTimer = 0;
     }
@@ -22,17 +37,36 @@ public class NPC {
     public void update(double deltaTime) {
         double movement = speed * deltaTime;
 
-        if (direction.equals("right")) {
-            worldX += movement;
+        if (movementType.equals("horizontal")) {
 
-            if (worldX >= 35 * 16) {
-                direction = "left";
+            if (direction.equals("right")) {
+                worldX += movement;
+
+                if (worldX >= patrolEnd) {
+                    direction = "left";
+                }
+            } else if (direction.equals("left")) {
+                worldX -= movement;
+
+                if (worldX <= patrolStart) {
+                    direction = "right";
+                }
             }
-        } else if (direction.equals("left")) {
-            worldX -= movement;
 
-            if (worldX <= 30 * 16) {
-                direction = "right";
+        } else if (movementType.equals("vertical")) {
+
+            if (direction.equals("down")) {
+                worldY += movement;
+
+                if (worldY >= patrolEnd) {
+                    direction = "up";
+                }
+            } else if (direction.equals("up")) {
+                worldY -= movement;
+
+                if (worldY <= patrolStart) {
+                    direction = "down";
+                }
             }
         }
     }

@@ -80,8 +80,8 @@ public class Main extends Application {
     private Image[] playerLeftWalk = new Image[5];
     private Image[] playerRightWalk = new Image[5];
 
-    private ImageView npc;
-    private NPC npcObject;
+    private ImageView[] npcs = new ImageView[3];
+    private NPC[] npcObjects = new NPC[3];
 
     private Image npcUpIdle;
     private Image npcDownIdle;
@@ -231,17 +231,22 @@ public class Main extends Application {
                 playerHitboxVisual.setX(playerObject.getWorldX() + HITBOX_OFFSET_X - cameraX);
                 playerHitboxVisual.setY(playerObject.getWorldY() + HITBOX_OFFSET_Y - cameraY);
 
-                npc.setX(npcObject.getWorldX() - cameraX);
-                npc.setY(npcObject.getWorldY() - cameraY);
+                for (int i = 0; i < npcObjects.length; i++) {
+                    npcObjects[i].update(deltaTime);
+                    npcObjects[i].animate(deltaTime);
 
-                npcObject.update(deltaTime);
+                    npcs[i].setX(npcObjects[i].getWorldX() - cameraX);
+                    npcs[i].setY(npcObjects[i].getWorldY() - cameraY);
 
-                npcObject.animate(deltaTime);
-
-                if (npcObject.getDirection().equals("right")) {
-                    npc.setImage(npcRightWalk[npcObject.getFrame()]);
-                } else if (npcObject.getDirection().equals("left")) {
-                    npc.setImage(npcLeftWalk[npcObject.getFrame()]);
+                    if (npcObjects[i].getDirection().equals("right")) {
+                        npcs[i].setImage(npcRightWalk[npcObjects[i].getFrame()]);
+                    } else if (npcObjects[i].getDirection().equals("left")) {
+                        npcs[i].setImage(npcLeftWalk[npcObjects[i].getFrame()]);
+                    } else if (npcObjects[i].getDirection().equals("up")) {
+                        npcs[i].setImage(npcUpWalk[npcObjects[i].getFrame()]);
+                    } else if (npcObjects[i].getDirection().equals("down")) {
+                        npcs[i].setImage(npcDownWalk[npcObjects[i].getFrame()]);
+                    }
                 }
             }
         };
@@ -254,7 +259,9 @@ public class Main extends Application {
                 200
         );
 
-        npcObject = new NPC(30 * 16, 20 * 16, 80);
+        npcObjects[0] = new NPC(26 * 16, 20 * 16, 80, 26 * 16, 42 * 16, "horizontal");
+        npcObjects[1] = new NPC(30 * 16, 28 * 16, 70, 30 * 16, 40 * 16, "vertical");
+        npcObjects[2] = new NPC(50 * 16, 40 * 16, 60, 40 * 16, 46 * 16, "vertical");
 
         Image grassImage = new Image(
                 getClass().getResource("/tiles/ground/grass.png").toExternalForm());
@@ -366,11 +373,13 @@ public class Main extends Application {
         player = new ImageView(playerDownIdle);
         player.setSmooth(false);
 
-        npc = new ImageView(npcDownIdle);
-        npc.setSmooth(false);
+        for (int i = 0; i < npcs.length; i++) {
+            npcs[i] = new ImageView(npcDownIdle);
+            npcs[i].setSmooth(false);
+            root.getChildren().add(npcs[i]);
+        }
 
         root.getChildren().add(player);
-        root.getChildren().add(npc);
         root.getChildren().add(buildingOverlay);
 
         // player's hitbox visuality
@@ -380,11 +389,15 @@ public class Main extends Application {
         player.setX(playerObject.getWorldX());
         player.setY(playerObject.getWorldY());
 
-        npc.setX(npcObject.getWorldX());
-        npc.setY(npcObject.getWorldY());
+        for (int i = 0; i < npcs.length; i++) {
+            npcs[i].setX(npcObjects[i].getWorldX());
+            npcs[i].setY(npcObjects[i].getWorldY());
+        }
 
         scale(player, 2);
-        scale(npc, 2);
+        for (int i = 0; i < npcs.length; i++) {
+            scale(npcs[i], 2);
+        }
 
         world.getTransforms().add(new Scale(2, 2, 0, 0));
         buildingOverlay.getTransforms().add(new Scale(2, 2, 0, 0));
