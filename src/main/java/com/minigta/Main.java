@@ -4,6 +4,7 @@ import javafx.animation.AnimationTimer;
 import javafx.application.Application;
 import javafx.scene.Scene;
 import javafx.scene.layout.Pane;
+import javafx.scene.text.Text;
 import javafx.scene.transform.Scale;
 import javafx.stage.Stage;
 import javafx.scene.image.Image;
@@ -26,6 +27,7 @@ public class Main extends Application {
     private boolean aDown = false;
     private boolean sDown = false;
     private boolean dDown = false;
+    private boolean ePressed = false;
     private long lastTime = 0;
     private double deltaTime;
     private ImageView playerIdle;
@@ -83,6 +85,9 @@ public class Main extends Application {
     private ImageView[] npcs = new ImageView[3];
     private NPC[] npcObjects = new NPC[3];
 
+    private Interactable interactable;
+    private ImageView interactableView;
+
     private Image npcUpIdle;
     private Image npcDownIdle;
     private Image npcLeftIdle;
@@ -92,6 +97,8 @@ public class Main extends Application {
     private Image[] npcDownWalk = new Image[4];
     private Image[] npcLeftWalk = new Image[4];
     private Image[] npcRightWalk = new Image[4];
+
+    private Text interactionText;
 
     @Override
     public void start(Stage stage) {
@@ -103,12 +110,19 @@ public class Main extends Application {
         root.setStyle("-fx-background-color: #ffffff;");
         Scene scene = new Scene(root, 1280, 720);
 
+        interactionText = new Text("Press E to interact");
+        interactionText.setVisible(false);
+        interactionText.setX(20);
+        interactionText.setY(40);
+        root.getChildren().add(interactionText);
+
         scene.setOnKeyPressed(event -> {
             switch (event.getCode()) {
                 case W -> wDown = true;
                 case A -> aDown = true;
                 case S -> sDown = true;
                 case D -> dDown = true;
+                case E -> ePressed = true;
             }
         });
 
@@ -118,6 +132,7 @@ public class Main extends Application {
                 case A -> aDown = false;
                 case S -> sDown = false;
                 case D -> dDown = false;
+                case E -> ePressed = false;
             }
         });
 
@@ -228,6 +243,26 @@ public class Main extends Application {
                 player.setX(playerObject.getWorldX() + 8 - cameraX);
                 player.setY(playerObject.getWorldY() + 12 - cameraY);
 
+                interactableView.setX(interactable.getWorldX() - cameraX);
+                interactableView.setY(interactable.getWorldY() - cameraY);
+
+                double distanceX = playerObject.getWorldX() - interactable.getWorldX();
+                double distanceY = playerObject.getWorldY() - interactable.getWorldY();
+
+                double distance = Math.sqrt(
+                        Math.pow(distanceX, 2) + Math.pow(distanceY, 2)
+                );
+
+                if (distance < 40) {
+                    interactionText.setVisible(true);
+
+                    if (ePressed) {
+                        System.out.println("Interacted with the object!");
+                    }
+                } else {
+                    interactionText.setVisible(false);
+                }
+
                 playerHitboxVisual.setX(playerObject.getWorldX() + HITBOX_OFFSET_X - cameraX);
                 playerHitboxVisual.setY(playerObject.getWorldY() + HITBOX_OFFSET_Y - cameraY);
 
@@ -258,6 +293,8 @@ public class Main extends Application {
                 scene.getHeight() / 2 - 24,
                 200
         );
+
+        interactable = new Interactable(35 * 16, 20 * 16);
 
         npcObjects[0] = new NPC(26 * 16, 20 * 16, 80, 26 * 16, 42 * 16, "horizontal");
         npcObjects[1] = new NPC(30 * 16, 28 * 16, 70, 30 * 16, 40 * 16, "vertical");
@@ -373,6 +410,10 @@ public class Main extends Application {
         player = new ImageView(playerDownIdle);
         player.setSmooth(false);
 
+        interactableView = new ImageView(hydrantImage);
+        interactableView.setSmooth(false);
+        root.getChildren().add(interactableView);
+
         for (int i = 0; i < npcs.length; i++) {
             npcs[i] = new ImageView(npcDownIdle);
             npcs[i].setSmooth(false);
@@ -388,6 +429,11 @@ public class Main extends Application {
 
         player.setX(playerObject.getWorldX());
         player.setY(playerObject.getWorldY());
+
+        interactableView.setX(interactable.getWorldX());
+        interactableView.setY(interactable.getWorldY());
+
+        scale(interactableView, 2);
 
         for (int i = 0; i < npcs.length; i++) {
             npcs[i].setX(npcObjects[i].getWorldX());
