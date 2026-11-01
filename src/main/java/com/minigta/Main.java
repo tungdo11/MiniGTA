@@ -87,16 +87,7 @@ public class Main extends Application {
     private String playerDirection = "down";
 
     private ImageView npc;
-
-    private double npcWorldX;
-    private double npcWorldY;
-
-    private double npcSpeed = 80;
-
-    private int npcFrame = 0;
-    private double npcAnimationTimer = 0;
-
-    private String npcDirection = "right";
+    private NPC npcObject;
 
     private Image npcUpIdle;
     private Image npcDownIdle;
@@ -275,40 +266,17 @@ public class Main extends Application {
                 playerHitboxVisual.setX(playerWorldX + HITBOX_OFFSET_X - cameraX);
                 playerHitboxVisual.setY(playerWorldY + HITBOX_OFFSET_Y - cameraY);
 
-                npc.setX(npcWorldX - cameraX);
-                npc.setY(npcWorldY - cameraY);
+                npc.setX(npcObject.getWorldX() - cameraX);
+                npc.setY(npcObject.getWorldY() - cameraY);
 
-                double npcMovement = npcSpeed * deltaTime;
+                npcObject.update(deltaTime);
 
-                if (npcDirection.equals("right")) {
-                    npcWorldX += npcMovement;
+                npcObject.animate(deltaTime);
 
-                    if (npcWorldX >= 35 * 16) {
-                        npcDirection = "left";
-                    }
-                } else if (npcDirection.equals("left")) {
-                    npcWorldX -= npcMovement;
-
-                    if (npcWorldX <= 30 * 16) {
-                        npcDirection = "right";
-                    }
-                }
-
-                npcAnimationTimer += deltaTime;
-
-                if (npcAnimationTimer >= 0.12) {
-                    npcFrame++;
-                    npcAnimationTimer = 0;
-
-                    if (npcFrame >= 4) {
-                        npcFrame = 0;
-                    }
-                }
-
-                if (npcDirection.equals("right")) {
-                    npc.setImage(npcRightWalk[npcFrame]);
-                } else if (npcDirection.equals("left")) {
-                    npc.setImage(npcLeftWalk[npcFrame]);
+                if (npcObject.getDirection().equals("right")) {
+                    npc.setImage(npcRightWalk[npcObject.getFrame()]);
+                } else if (npcObject.getDirection().equals("left")) {
+                    npc.setImage(npcLeftWalk[npcObject.getFrame()]);
                 }
             }
         };
@@ -318,8 +286,7 @@ public class Main extends Application {
         playerWorldX = scene.getWidth() / 2 - 24;
         playerWorldY = scene.getHeight() / 2 - 24;
 
-        npcWorldX = 30 * 16;
-        npcWorldY = 20 * 16;
+        npcObject = new NPC(30 * 16, 20 * 16, 80);
 
         Image grassImage = new Image(
                 getClass().getResource("/tiles/ground/grass.png").toExternalForm());
@@ -445,8 +412,8 @@ public class Main extends Application {
         player.setX(playerWorldX);
         player.setY(playerWorldY);
 
-        npc.setX(npcWorldX);
-        npc.setY(npcWorldY);
+        npc.setX(npcObject.getWorldX());
+        npc.setY(npcObject.getWorldY());
 
         scale(player, 2);
         scale(npc, 2);
