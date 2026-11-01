@@ -28,6 +28,7 @@ public class Main extends Application {
     private boolean sDown = false;
     private boolean dDown = false;
     private boolean ePressed = false;
+    private boolean eWasPressed = false;
     private long lastTime = 0;
     private double deltaTime;
     private ImageView playerIdle;
@@ -122,7 +123,11 @@ public class Main extends Application {
                 case A -> aDown = true;
                 case S -> sDown = true;
                 case D -> dDown = true;
-                case E -> ePressed = true;
+                case E -> {
+                    if (!ePressed) {
+                        ePressed = true;
+                    }
+                }
             }
         });
 
@@ -256,12 +261,14 @@ public class Main extends Application {
                 if (distance < 40) {
                     interactionText.setVisible(true);
 
-                    if (ePressed) {
+                    if (ePressed && !eWasPressed) {
                         System.out.println("Interacted with the object!");
                     }
                 } else {
                     interactionText.setVisible(false);
                 }
+
+                eWasPressed = ePressed;
 
                 playerHitboxVisual.setX(playerObject.getWorldX() + HITBOX_OFFSET_X - cameraX);
                 playerHitboxVisual.setY(playerObject.getWorldY() + HITBOX_OFFSET_Y - cameraY);
