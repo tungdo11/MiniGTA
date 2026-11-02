@@ -86,8 +86,8 @@ public class Main extends Application {
     private ImageView[] npcs = new ImageView[3];
     private NPC[] npcObjects = new NPC[3];
 
-    private Interactable interactable;
-    private ImageView interactableView;
+    private Interactable[] interactables = new Interactable[3];
+    private ImageView[] interactableViews = new ImageView[3];
 
     private Image npcUpIdle;
     private Image npcDownIdle;
@@ -248,21 +248,39 @@ public class Main extends Application {
                 player.setX(playerObject.getWorldX() + 8 - cameraX);
                 player.setY(playerObject.getWorldY() + 12 - cameraY);
 
-                interactableView.setX(interactable.getWorldX() - cameraX);
-                interactableView.setY(interactable.getWorldY() - cameraY);
+                for (int i = 0; i < interactableViews.length; i++) {
+                    interactableViews[i].setX(interactables[i].getWorldX() - cameraX);
+                    interactableViews[i].setY(interactables[i].getWorldY() - cameraY);
+                }
 
-                double distanceX = playerObject.getWorldX() - interactable.getWorldX();
-                double distanceY = playerObject.getWorldY() - interactable.getWorldY();
+                double closestDistance = Double.MAX_VALUE;
+                int closestInteractable = -1;
 
-                double distance = Math.sqrt(
-                        Math.pow(distanceX, 2) + Math.pow(distanceY, 2)
-                );
+                for (int i = 0; i < interactables.length; i++) {
+                    double distanceX = playerObject.getWorldX() - interactables[i].getWorldX();
+                    double distanceY = playerObject.getWorldY() - interactables[i].getWorldY();
 
-                if (distance < 40) {
+                    double distance = Math.sqrt(
+                            Math.pow(distanceX, 2) + Math.pow(distanceY, 2)
+                    );
+
+                    if (distance < closestDistance) {
+                        closestDistance = distance;
+                        closestInteractable = i;
+                    }
+                }
+
+                if (closestDistance < 40) {
                     interactionText.setVisible(true);
 
                     if (ePressed && !eWasPressed) {
-                        System.out.println("Interacted with the object!");
+                        if (interactables[closestInteractable].getType().equals("hydrant")) {
+                            System.out.println("You interacted with a hydrant.");
+                        } else if (interactables[closestInteractable].getType().equals("sign")) {
+                            System.out.println("You read the sign.");
+                        } else if (interactables[closestInteractable].getType().equals("bench")) {
+                            System.out.println("You found a bench.");
+                        }
                     }
                 } else {
                     interactionText.setVisible(false);
@@ -301,7 +319,9 @@ public class Main extends Application {
                 200
         );
 
-        interactable = new Interactable(35 * 16, 20 * 16);
+        interactables[0] = new Interactable(35 * 16, 20 * 16, "hydrant");
+        interactables[1] = new Interactable(38 * 16, 20 * 16, "trashcan");
+        interactables[2] = new Interactable(41 * 16, 20 * 16, "bench");
 
         npcObjects[0] = new NPC(26 * 16, 20 * 16, 80, 26 * 16, 42 * 16, "horizontal");
         npcObjects[1] = new NPC(30 * 16, 28 * 16, 70, 30 * 16, 40 * 16, "vertical");
@@ -344,6 +364,14 @@ public class Main extends Application {
 
         Image hydrantImage = new Image(
                 getClass().getResource("/tiles/props/hydrant.png").toExternalForm()
+        );
+
+        Image benchImage = new Image(
+                getClass().getResource("/tiles/props/bench.png").toExternalForm()
+        );
+
+        Image trashcanImage = new Image(
+                getClass().getResource("/tiles/props/trashcan.png").toExternalForm()
         );
 
         playerUpIdle = new Image(
@@ -417,9 +445,19 @@ public class Main extends Application {
         player = new ImageView(playerDownIdle);
         player.setSmooth(false);
 
-        interactableView = new ImageView(hydrantImage);
-        interactableView.setSmooth(false);
-        root.getChildren().add(interactableView);
+        for (int i = 0; i < interactableViews.length; i++) {
+
+            if (interactables[i].getType().equals("hydrant")) {
+                interactableViews[i] = new ImageView(hydrantImage);
+            } else if (interactables[i].getType().equals("trashcan")) {
+                interactableViews[i] = new ImageView(trashcanImage);
+            } else if (interactables[i].getType().equals("bench")) {
+                interactableViews[i] = new ImageView(benchImage);
+            }
+
+            interactableViews[i].setSmooth(false);
+            root.getChildren().add(interactableViews[i]);
+        }
 
         for (int i = 0; i < npcs.length; i++) {
             npcs[i] = new ImageView(npcDownIdle);
@@ -437,10 +475,11 @@ public class Main extends Application {
         player.setX(playerObject.getWorldX());
         player.setY(playerObject.getWorldY());
 
-        interactableView.setX(interactable.getWorldX());
-        interactableView.setY(interactable.getWorldY());
-
-        scale(interactableView, 2);
+        for (int i = 0; i < interactableViews.length; i++) {
+            interactableViews[i].setX(interactables[i].getWorldX());
+            interactableViews[i].setY(interactables[i].getWorldY());
+            scale(interactableViews[i], 2);
+        }
 
         for (int i = 0; i < npcs.length; i++) {
             npcs[i].setX(npcObjects[i].getWorldX());

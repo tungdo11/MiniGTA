@@ -4,10 +4,12 @@ public class Interactable {
 
     private double worldX;
     private double worldY;
+    private String type;
 
-    public Interactable(double worldX, double worldY) {
+    public Interactable(double worldX, double worldY, String type) {
         this.worldX = worldX;
         this.worldY = worldY;
+        this.type = type;
     }
 
     public double getWorldX() {
@@ -16,5 +18,9 @@ public class Interactable {
 
     public double getWorldY() {
         return worldY;
+    }
+
+    public String getType() {
+        return type;
     }
 }
