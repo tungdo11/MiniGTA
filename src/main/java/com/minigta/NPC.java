@@ -7,6 +7,7 @@ public class NPC {
     private double speed;
     private String direction;
     private String movementType;
+    private int groupId;
 
     private int frame;
     private double animationTimer;
@@ -15,13 +16,14 @@ public class NPC {
     private double patrolEnd;
 
     public NPC(double worldX, double worldY, double speed,
-               double patrolStart, double patrolEnd, String movementType) {
+               double patrolStart, double patrolEnd, String movementType, int groupId) {
         this.worldX = worldX;
         this.worldY = worldY;
         this.speed = speed;
         this.patrolStart = patrolStart;
         this.patrolEnd = patrolEnd;
         this.movementType = movementType;
+        this.groupId = groupId;
 
         if (movementType.equals("vertical")) {
             this.direction = "down";
@@ -98,5 +100,22 @@ public class NPC {
 
     public int getFrame() {
         return frame;
+    }
+
+    public int getGroupId() {
+        return groupId;
+    }
+
+    public void setWorldX(double worldX) {
+        this.worldX = worldX;
+    }
+
+    public void setWorldY(double worldY) {
+        this.worldY = worldY;
+    }
+
+    public void follow(NPC leader, double offsetX, double offsetY) {
+        worldX = leader.getWorldX() + offsetX;
+        worldY = leader.getWorldY() + offsetY;
     }
 }

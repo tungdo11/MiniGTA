@@ -292,7 +292,10 @@ public class Main extends Application {
                 playerHitboxVisual.setY(playerObject.getWorldY() + HITBOX_OFFSET_Y - cameraY);
 
                 for (int i = 0; i < npcObjects.length; i++) {
-                    npcObjects[i].update(deltaTime);
+                    if (i != 2) {
+                        npcObjects[i].update(deltaTime);
+                    }
+
                     npcObjects[i].animate(deltaTime);
 
                     npcs[i].setX(npcObjects[i].getWorldX() - cameraX);
@@ -307,6 +310,10 @@ public class Main extends Application {
                     } else if (npcObjects[i].getDirection().equals("down")) {
                         npcs[i].setImage(npcDownWalk[npcObjects[i].getFrame()]);
                     }
+                }
+
+                if (npcObjects[1].getGroupId() == npcObjects[2].getGroupId()) {
+                    npcObjects[2].follow(npcObjects[1], 32, 32);
                 }
             }
         };
@@ -323,9 +330,9 @@ public class Main extends Application {
         interactables[1] = new Interactable(38 * 16, 20 * 16, "trashcan");
         interactables[2] = new Interactable(41 * 16, 20 * 16, "bench");
 
-        npcObjects[0] = new NPC(26 * 16, 20 * 16, 80, 26 * 16, 42 * 16, "horizontal");
-        npcObjects[1] = new NPC(30 * 16, 28 * 16, 70, 30 * 16, 40 * 16, "vertical");
-        npcObjects[2] = new NPC(50 * 16, 40 * 16, 60, 40 * 16, 46 * 16, "vertical");
+        npcObjects[0] = new NPC(26 * 16, 20 * 16, 80, 26 * 16, 42 * 16, "horizontal", 1);
+        npcObjects[1] = new NPC(30 * 16, 28 * 16, 70, 30 * 16, 40 * 16, "vertical", 2);
+        npcObjects[2] = new NPC(50 * 16, 40 * 16, 60, 40 * 16, 46 * 16, "vertical", 2);
 
         Image grassImage = new Image(
                 getClass().getResource("/tiles/ground/grass.png").toExternalForm());
