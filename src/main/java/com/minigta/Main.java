@@ -4,6 +4,7 @@ import javafx.animation.AnimationTimer;
 import javafx.application.Application;
 import javafx.scene.Scene;
 import javafx.scene.layout.Pane;
+import javafx.scene.shape.Polygon;
 import javafx.scene.text.Text;
 import javafx.scene.transform.Scale;
 import javafx.stage.Stage;
@@ -12,6 +13,8 @@ import javafx.scene.image.ImageView;
 import javafx.scene.shape.Rectangle;
 import javafx.scene.paint.ImagePattern;
 import javafx.scene.Group;
+import javafx.scene.shape.Polygon;
+import javafx.scene.paint.Color;
 
 import java.lang.Math;
 
@@ -27,8 +30,19 @@ public class Main extends Application {
     private boolean aDown = false;
     private boolean sDown = false;
     private boolean dDown = false;
-    private boolean ePressed = false;
-    private boolean eWasPressed = false;
+
+    private boolean drivingW = false;
+    private boolean drivingA = false;
+    private boolean drivingS = false;
+    private boolean drivingD = false;
+    private boolean handbrakeDown = false;
+
+    private boolean isDriving = false;
+    private int currentCar = -1;
+
+    private boolean fPressed = false;
+    private boolean fWasPressed = false;
+
     private long lastTime = 0;
     private double deltaTime;
     private ImageView playerIdle;
@@ -40,6 +54,8 @@ public class Main extends Application {
     private static final double HITBOX_OFFSET_Y = 18;
     private static final double HITBOX_WIDTH = 16;
     private static final double HITBOX_HEIGHT = 18;
+
+    private static final double CAR_INTERACTION_DISTANCE = 60;
 
     private static Rectangle playerHitbox =
             new Rectangle(
@@ -89,6 +105,9 @@ public class Main extends Application {
     private Interactable[] interactables = new Interactable[3];
     private ImageView[] interactableViews = new ImageView[3];
 
+    private Car[] cars = new Car[1];
+    private ImageView[] carViews = new ImageView[1];
+
     private Image npcUpIdle;
     private Image npcDownIdle;
     private Image npcLeftIdle;
@@ -101,6 +120,8 @@ public class Main extends Application {
 
     private Text interactionText;
 
+    private Polygon carHitboxVisual;
+
     @Override
     public void start(Stage stage) {
         Pane root = new Pane();
@@ -111,7 +132,7 @@ public class Main extends Application {
         root.setStyle("-fx-background-color: #ffffff;");
         Scene scene = new Scene(root, 1280, 720);
 
-        interactionText = new Text("Press E to interact");
+        interactionText = new Text("Press F to interact");
         interactionText.setVisible(false);
         interactionText.setX(20);
         interactionText.setY(40);
@@ -119,25 +140,53 @@ public class Main extends Application {
 
         scene.setOnKeyPressed(event -> {
             switch (event.getCode()) {
-                case W -> wDown = true;
-                case A -> aDown = true;
-                case S -> sDown = true;
-                case D -> dDown = true;
-                case E -> {
-                    if (!ePressed) {
-                        ePressed = true;
+                case W -> {
+                    if (isDriving) drivingW = true;
+                    else wDown = true;
+                }
+                case A -> {
+                    if (isDriving) drivingA = true;
+                    else aDown = true;
+                }
+                case S -> {
+                    if (isDriving) drivingS = true;
+                    else sDown = true;
+                }
+                case D -> {
+                    if (isDriving) drivingD = true;
+                    else dDown = true;
+                }
+                case F -> {
+                    if (!fPressed) {
+                        fPressed = true;
                     }
+                }
+                case SPACE -> {
+                    if (isDriving) handbrakeDown = true;
                 }
             }
         });
 
         scene.setOnKeyReleased(event -> {
             switch (event.getCode()) {
-                case W -> wDown = false;
-                case A -> aDown = false;
-                case S -> sDown = false;
-                case D -> dDown = false;
-                case E -> ePressed = false;
+                case W -> {
+                    if (isDriving) drivingW = false;
+                    else wDown = false;
+                }
+                case A -> {
+                    if (isDriving) drivingA = false;
+                    else aDown = false;
+                }
+                case S -> {
+                    if (isDriving) drivingS = false;
+                    else sDown = false;
+                }
+                case D -> {
+                    if (isDriving) drivingD = false;
+                    else dDown = false;
+                }
+                case F -> fPressed = false;
+                case SPACE -> handbrakeDown = false;
             }
         });
 
@@ -153,85 +202,145 @@ public class Main extends Application {
                 deltaTime = (now - lastTime) / 1_000_000_000.0;
                 lastTime = now;
 
+                if (!isDriving) {
+                    double dx = 0;
+                    double dy = 0;
+                    double speed = 200;
 
-                double dx = 0;
-                double dy = 0;
-                double speed = 200;
+                    if (wDown) dy--;
+                    if (sDown) dy++;
+                    if (aDown) dx--;
+                    if (dDown) dx++;
 
-                if (wDown) dy--;
-                if (sDown) dy++;
-                if (aDown) dx--;
-                if (dDown) dx++;
+                    playerObject.updateDirection(dx, dy);
 
-                playerObject.updateDirection(dx, dy);
-
-                playerObject.animate(deltaTime, dx != 0 || dy != 0);
+                    playerObject.animate(deltaTime, dx != 0 || dy != 0);
 
 
-                if (dx != 0 || dy != 0) {
-                    if (playerObject.getDirection().equals("up")) {
-                        player.setImage(playerUpWalk[playerObject.getFrame()]);
-                    } else if (playerObject.getDirection().equals("down")) {
-                        player.setImage(playerDownWalk[playerObject.getFrame()]);
-                    } else if (playerObject.getDirection().equals("right")) {
-                        player.setImage(playerRightWalk[playerObject.getFrame()]);
-                    } else if (playerObject.getDirection().equals("left")) {
-                        player.setImage(playerLeftWalk[playerObject.getFrame()]);
+                    if (dx != 0 || dy != 0) {
+                        if (playerObject.getDirection().equals("up")) {
+                            player.setImage(playerUpWalk[playerObject.getFrame()]);
+                        } else if (playerObject.getDirection().equals("down")) {
+                            player.setImage(playerDownWalk[playerObject.getFrame()]);
+                        } else if (playerObject.getDirection().equals("right")) {
+                            player.setImage(playerRightWalk[playerObject.getFrame()]);
+                        } else if (playerObject.getDirection().equals("left")) {
+                            player.setImage(playerLeftWalk[playerObject.getFrame()]);
+                        }
+                    } else {
+                        if (playerObject.getDirection().equals("up")) {
+                            player.setImage(playerUpIdle);
+                        } else if (playerObject.getDirection().equals("down")) {
+                            player.setImage(playerDownIdle);
+                        } else if (playerObject.getDirection().equals("right")) {
+                            player.setImage(playerRightIdle);
+                        } else if (playerObject.getDirection().equals("left")) {
+                            player.setImage(playerLeftIdle);
+                        }
                     }
+
+                    double movement = 200 * deltaTime;
+
+                    double length = Math.sqrt(Math.pow(dx, 2) + Math.pow(dy, 2));
+
+                    if (length > 0) {
+                        dx /= length;
+                        dy /= length;
+                    }
+
+                    double oldX = playerObject.getWorldX();
+
+                    playerObject.moveX(dx * movement);
+                    playerHitbox.setX(playerObject.getWorldX() + HITBOX_OFFSET_X);
+
+                    for (Rectangle building : buildingHitbox) {
+                        if (building != null &&
+                                checkCollision(playerHitbox, building)) {
+
+                            playerObject.setWorldX(oldX);
+                            playerHitbox.setX(playerObject.getWorldX() + HITBOX_OFFSET_X);
+                            break;
+                        }
+                    }
+
+                    double oldY = playerObject.getWorldY();
+
+                    playerObject.moveY(dy * movement);
+
+
+                    playerHitbox.setY(playerObject.getWorldY() + HITBOX_OFFSET_Y);
+
+                    for (Rectangle building : buildingHitbox) {
+                        if (building != null &&
+                                checkCollision(playerHitbox, building)) {
+
+                            playerObject.setWorldY(oldY);
+                            playerHitbox.setY(playerObject.getWorldY() + HITBOX_OFFSET_Y);
+                            break;
+                        }
+                    }
+                }
+
+                if (isDriving) {
+                    Car car = cars[currentCar];
+                    car.setHandbrakeActive(handbrakeDown);
+
+                    int tileColumn = (int) ((car.getWorldX() + 20) / 32);
+                    int tileRow = (int) ((car.getWorldY() + 36) / 32);
+
+                    double surfaceGrip = 1.0;
+
+                    if (tileRow >= 0 && tileRow < map.length
+                            && tileColumn >= 0 && tileColumn < map[0].length) {
+
+                        int surface = map[tileRow][tileColumn];
+
+                        if (surface == GRASS) {
+                            surfaceGrip = 0.55;
+                        } else if (surface == SIDEWALK) {
+                            surfaceGrip = 0.85;
+                        } else {
+                            surfaceGrip = 1.0;
+                        }
+                    }
+
+                    car.setGrip(surfaceGrip);
+
+                    boolean braking = drivingS && car.getSpeed() > 0;
+
+                    if (drivingW) car.accelerate(deltaTime);
+                    else if (drivingS) car.reverse(deltaTime);
+                    else if (handbrakeDown) car.handbrake(deltaTime);
+                    else car.applyFriction(deltaTime);
+
+                    if (drivingA) car.steerLeft(deltaTime, braking);
+
+                    if (drivingD) car.steerRight(deltaTime, braking);
+
+                    car.move(deltaTime);
+
+                    for (Rectangle building : buildingHitbox) {
+                        if (building != null && car.resolveCollision(building)) {
+                            break;
+                        }
+                    }
+
+                    carViews[currentCar].setRotate(car.getAngle());
+                }
+
+                double cameraTargetX;
+                double cameraTargetY;
+
+                if (isDriving) {
+                    cameraTargetX = cars[currentCar].getWorldX();
+                    cameraTargetY = cars[currentCar].getWorldY();
                 } else {
-                    if (playerObject.getDirection().equals("up")) {
-                        player.setImage(playerUpIdle);
-                    } else if (playerObject.getDirection().equals("down")) {
-                        player.setImage(playerDownIdle);
-                    } else if (playerObject.getDirection().equals("right")) {
-                        player.setImage(playerRightIdle);
-                    } else if (playerObject.getDirection().equals("left")) {
-                        player.setImage(playerLeftIdle);
-                    }
+                    cameraTargetX = playerObject.getWorldX() + 24;
+                    cameraTargetY = playerObject.getWorldY() + 24;
                 }
 
-                double movement = 200 * deltaTime;
-
-                double length = Math.sqrt(Math.pow(dx, 2) + Math.pow(dy, 2));
-
-                if (length > 0) {
-                    dx /= length;
-                    dy /= length;
-                }
-
-                double oldX = playerObject.getWorldX();
-
-                playerObject.moveX(dx * movement);
-                playerHitbox.setX(playerObject.getWorldX() + HITBOX_OFFSET_X);
-
-                for (Rectangle building : buildingHitbox) {
-                    if (building != null &&
-                            checkCollision(playerHitbox, building)) {
-
-                        playerObject.setWorldX(oldX);
-                        playerHitbox.setX(playerObject.getWorldX() + HITBOX_OFFSET_X);
-                        break;
-                    }
-                }
-
-                double oldY = playerObject.getWorldY();
-
-                playerObject.moveY(dy * movement);
-
-                playerHitbox.setY(playerObject.getWorldY() + HITBOX_OFFSET_Y);
-
-                for (Rectangle building : buildingHitbox) {
-                    if (building != null &&
-                            checkCollision(playerHitbox, building)) {
-
-                        playerObject.setWorldY(oldY);
-                        playerHitbox.setY(playerObject.getWorldY() + HITBOX_OFFSET_Y);
-                        break;
-                    }
-                }
-
-                cameraX = playerObject.getWorldX() - scene.getWidth() / 2 + 24;
-                cameraY = playerObject.getWorldY() - scene.getHeight() / 2 + 24;
+                cameraX = cameraTargetX - scene.getWidth() / 2;
+                cameraY = cameraTargetY - scene.getHeight() / 2;
 
                 double worldWidth = map[0].length * 16 * 2;
                 double worldHeight = map.length * 16 * 2;
@@ -251,6 +360,42 @@ public class Main extends Application {
                 for (int i = 0; i < interactableViews.length; i++) {
                     interactableViews[i].setX(interactables[i].getWorldX() - cameraX);
                     interactableViews[i].setY(interactables[i].getWorldY() - cameraY);
+                }
+
+                carViews[0].setX(cars[0].getWorldX() - cameraX);
+                carViews[0].setY(cars[0].getWorldY() - cameraY);
+
+                Car car = cars[0];
+
+                // Adjust the hitbox dimensions
+                double halfWidth = 17 * 1.8 / 2;
+                double halfHeight = 32 * 1.8 / 2;
+
+                double centerX = car.getWorldX() + 23.0 / 2 - cameraX;
+                double centerY = car.getWorldY() + 40.0 / 2 - cameraY;
+
+                double radians = Math.toRadians(car.getAngle());
+
+                double cos = Math.cos(radians);
+                double sin = Math.sin(radians);
+
+                double[][] corners = {
+                        {-halfWidth, -halfHeight},
+                        {halfWidth, -halfHeight},
+                        {halfWidth, halfHeight},
+                        {-halfWidth, halfHeight}
+                };
+
+                carHitboxVisual.getPoints().clear();
+
+                for (double[] corner : corners) {
+                    double rotatedX = corner[0] * cos - corner[1] * sin;
+                    double rotatedY = corner[0] * sin + corner[1] * cos;
+
+                    carHitboxVisual.getPoints().addAll(
+                            centerX + rotatedX,
+                            centerY + rotatedY
+                    );
                 }
 
                 double closestDistance = Double.MAX_VALUE;
@@ -273,7 +418,7 @@ public class Main extends Application {
                 if (closestDistance < 40) {
                     interactionText.setVisible(true);
 
-                    if (ePressed && !eWasPressed) {
+                    if (fPressed && !fWasPressed) {
                         if (interactables[closestInteractable].getType().equals("hydrant")) {
                             System.out.println("You interacted with a hydrant.");
                         } else if (interactables[closestInteractable].getType().equals("sign")) {
@@ -286,7 +431,66 @@ public class Main extends Application {
                     interactionText.setVisible(false);
                 }
 
-                eWasPressed = ePressed;
+                double carDistanceX = playerObject.getWorldX() - cars[0].getWorldX();
+                double carDistanceY = playerObject.getWorldY() - cars[0].getWorldY();
+
+                double carDistance = Math.sqrt(Math.pow(carDistanceX, 2) + Math.pow(carDistanceY, 2));
+
+                if (!isDriving && carDistance < CAR_INTERACTION_DISTANCE) {
+                    interactionText.setText("Press F to enter taxi");
+                    interactionText.setVisible(true);
+
+                    if (fPressed && !fWasPressed) {
+                        isDriving = true;
+                        currentCar = 0;
+                        handbrakeDown = false;
+                        player.setVisible(false);
+                    }
+                } else if (isDriving) {
+                    interactionText.setText("Press F to exit the vehicle");
+                    interactionText.setVisible(true);
+
+                    if (fPressed && !fWasPressed) {
+//                        Car car = cars[currentCar];
+
+                        double[] leftExit = car.getExitPosition(true);
+                        double[] rightExit = car.getExitPosition(false);
+
+                        boolean leftSafe = isSafeExit(leftExit[0], leftExit[1]);
+                        boolean rightSafe = isSafeExit(rightExit[0], rightExit[1]);
+
+                        if (leftSafe || rightSafe) {
+                            double[] exitPosition = leftSafe ? leftExit : rightExit;
+
+                            playerObject.setWorldX(exitPosition[0]);
+                            playerObject.setWorldY(exitPosition[1]);
+
+                            isDriving = false;
+                            currentCar = -1;
+
+                            handbrakeDown = false;
+
+                            wDown = false;
+                            aDown = false;
+                            sDown = false;
+                            dDown = false;
+
+                            drivingW = false;
+                            drivingA = false;
+                            drivingS = false;
+                            drivingD = false;
+
+                            player.setVisible(true);
+
+                            playerHitbox.setX(playerObject.getWorldX() + HITBOX_OFFSET_X);
+                            playerHitbox.setY(playerObject.getWorldY() + HITBOX_OFFSET_Y);
+                        } else {
+                            interactionText.setText("No safe place to exit!");
+                        }
+                    }
+                }
+
+                fWasPressed = fPressed;
 
                 playerHitboxVisual.setX(playerObject.getWorldX() + HITBOX_OFFSET_X - cameraX);
                 playerHitboxVisual.setY(playerObject.getWorldY() + HITBOX_OFFSET_Y - cameraY);
@@ -330,9 +534,12 @@ public class Main extends Application {
         interactables[1] = new Interactable(38 * 16, 20 * 16, "trashcan");
         interactables[2] = new Interactable(41 * 16, 20 * 16, "bench");
 
+        cars[0] = new Car(21 * 16, 18 * 16, 0, "right", "taxi");
+
         npcObjects[0] = new NPC(26 * 16, 20 * 16, 80, 26 * 16, 42 * 16, "horizontal", 1);
         npcObjects[1] = new NPC(30 * 16, 28 * 16, 70, 30 * 16, 40 * 16, "vertical", 2);
         npcObjects[2] = new NPC(50 * 16, 40 * 16, 60, 40 * 16, 46 * 16, "vertical", 2);
+
 
         Image grassImage = new Image(
                 getClass().getResource("/tiles/ground/grass.png").toExternalForm());
@@ -379,6 +586,10 @@ public class Main extends Application {
 
         Image trashcanImage = new Image(
                 getClass().getResource("/tiles/props/trashcan.png").toExternalForm()
+        );
+
+        Image taxiImage = new Image(
+                getClass().getResource("/tiles/vehicles/taxi/taxi_frame_01.png").toExternalForm()
         );
 
         playerUpIdle = new Image(
@@ -449,6 +660,9 @@ public class Main extends Application {
             );
         }
 
+        carViews[0] = new ImageView(taxiImage);
+        carViews[0].setSmooth(false);
+
         player = new ImageView(playerDownIdle);
         player.setSmooth(false);
 
@@ -472,6 +686,8 @@ public class Main extends Application {
             root.getChildren().add(npcs[i]);
         }
 
+        root.getChildren().add(carViews[0]);
+
         root.getChildren().add(player);
         root.getChildren().add(buildingOverlay);
 
@@ -493,10 +709,26 @@ public class Main extends Application {
             npcs[i].setY(npcObjects[i].getWorldY());
         }
 
+        carViews[0].setX(cars[0].getWorldX());
+        carViews[0].setY(cars[0].getWorldY());
+
         scale(player, 2);
         for (int i = 0; i < npcs.length; i++) {
             scale(npcs[i], 2);
         }
+
+        scale(carViews[0], 1.8);
+
+        carHitboxVisual = new Polygon();
+
+        // Hitbox visibility
+        carHitboxVisual.setVisible(false);
+
+        carHitboxVisual.setFill(Color.rgb(255, 0, 0, 0.20));
+        carHitboxVisual.setStroke(Color.RED);
+        carHitboxVisual.setStrokeWidth(1.5);
+
+        root.getChildren().add(carHitboxVisual);
 
         world.getTransforms().add(new Scale(2, 2, 0, 0));
         buildingOverlay.getTransforms().add(new Scale(2, 2, 0, 0));
@@ -763,5 +995,44 @@ public class Main extends Application {
         prop.setFitHeight(height);
 
         world.getChildren().add(prop);
+    }
+
+    public boolean carCollidesWithBuilding(Car car, Rectangle building) {
+        double centerX = car.getWorldX() + 20;
+        double centerY = car.getWorldY() + 36;
+        double radius = 24;
+
+        double closestX = Math.max(building.getX(), Math.min(centerX, building.getX() + building.getWidth()));
+
+        double closestY = Math.max(building.getY(), Math.min(centerY, building.getY() + building.getHeight()));
+
+        double distanceX = centerX - closestX;
+        double distanceY = centerY - closestY;
+
+        return distanceX * distanceX + distanceY * distanceY < radius * radius;
+    }
+
+    private boolean isSafeExit(double x, double y) {
+        if (x + HITBOX_OFFSET_X < 0
+                || y + HITBOX_OFFSET_Y < 0
+                || x + HITBOX_OFFSET_X + HITBOX_WIDTH > map[0].length * 32
+                || y + HITBOX_OFFSET_Y + HITBOX_HEIGHT > map.length * 32) {
+            return false;
+        }
+
+        Rectangle exitHitbox = new Rectangle(
+                x + HITBOX_OFFSET_X,
+                y + HITBOX_OFFSET_Y,
+                HITBOX_WIDTH,
+                HITBOX_HEIGHT
+        );
+
+        for (Rectangle building : buildingHitbox) {
+            if (building != null && checkCollision(exitHitbox, building)) {
+                return false;
+            }
+        }
+
+        return true;
     }
 }

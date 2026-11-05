@@ -23,4 +23,12 @@ public class Interactable {
     public String getType() {
         return type;
     }
+
+    public void setWorldX(double worldX) {
+        this.worldX = worldX;
+    }
+
+    public void setWorldY(double worldY) {
+        this.worldY = worldY;
+    }
 }
