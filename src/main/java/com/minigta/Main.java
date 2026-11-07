@@ -11,9 +11,7 @@ import javafx.stage.Stage;
 import javafx.scene.image.Image;
 import javafx.scene.image.ImageView;
 import javafx.scene.shape.Rectangle;
-import javafx.scene.paint.ImagePattern;
 import javafx.scene.Group;
-import javafx.scene.shape.Polygon;
 import javafx.scene.paint.Color;
 
 import java.lang.Math;
@@ -85,7 +83,17 @@ public class Main extends Application {
     private static final int INTERSECTION = 4;
     private static final int BUILDING = 5;
 
-    private int[][] map = new int[48][64];
+    private static final int ROAD_CORNER_BL = 6;
+    private static final int ROAD_CORNER_BR = 7;
+    private static final int ROAD_CORNER_TL = 8;
+    private static final int ROAD_CORNER_TR = 9;
+
+    private static final int SIDEWALK_CORNER_BL = 10;
+    private static final int SIDEWALK_CORNER_BR = 11;
+    private static final int SIDEWALK_CORNER_TL = 12;
+    private static final int SIDEWALK_CORNER_TR = 13;
+
+    private int[][] map = new int[96][144];
 
     private ImageView player;
 
@@ -129,6 +137,20 @@ public class Main extends Application {
         Group buildingOverlay = new Group();
 
         root.getChildren().add(world);
+
+        Image cityMapImage = new Image(
+                getClass().getResource("/map/base/city_map.png").toExternalForm()
+        );
+
+        ImageView cityMapView = new ImageView(cityMapImage);
+
+        cityMapView.setFitWidth(2880);
+        cityMapView.setFitHeight(1920);
+        cityMapView.setPreserveRatio(true);
+        cityMapView.setSmooth(false);
+
+        world.getChildren().add(cityMapView);
+
         root.setStyle("-fx-background-color: #ffffff;");
         Scene scene = new Scene(root, 1280, 720);
 
@@ -342,8 +364,8 @@ public class Main extends Application {
                 cameraX = cameraTargetX - scene.getWidth() / 2;
                 cameraY = cameraTargetY - scene.getHeight() / 2;
 
-                double worldWidth = map[0].length * 16 * 2;
-                double worldHeight = map.length * 16 * 2;
+                double worldWidth = cityMapView.getBoundsInLocal().getWidth() * 2;
+                double worldHeight = cityMapView.getBoundsInLocal().getHeight() * 2;
 
                 cameraX = Math.max(0, Math.min(cameraX, worldWidth - scene.getWidth()));
                 cameraY = Math.max(0, Math.min(cameraY, worldHeight - scene.getHeight()));
@@ -522,141 +544,171 @@ public class Main extends Application {
             }
         };
 
-        Image logoImage = new Image(getClass().getResource("/logo.png").toExternalForm());
-
-        playerObject = new Player(
-                scene.getWidth() / 2 - 24,
-                scene.getHeight() / 2 - 24,
-                200
+        Image logoImage = new Image(
+                getClass().getResource("/logo.png").toExternalForm()
         );
 
-        interactables[0] = new Interactable(35 * 16, 20 * 16, "hydrant");
-        interactables[1] = new Interactable(38 * 16, 20 * 16, "trashcan");
-        interactables[2] = new Interactable(41 * 16, 20 * 16, "bench");
+        playerObject = new Player(985, 3095, 200);
 
-        cars[0] = new Car(21 * 16, 18 * 16, 0, "right", "taxi");
+        interactables[0] = new Interactable(450, 2700, "hydrant");
+        interactables[1] = new Interactable(1050, 2700, "trashcan");
+        interactables[2] = new Interactable(1250, 2900, "bench");
 
-        npcObjects[0] = new NPC(26 * 16, 20 * 16, 80, 26 * 16, 42 * 16, "horizontal", 1);
-        npcObjects[1] = new NPC(30 * 16, 28 * 16, 70, 30 * 16, 40 * 16, "vertical", 2);
-        npcObjects[2] = new NPC(50 * 16, 40 * 16, 60, 40 * 16, 46 * 16, "vertical", 2);
+        cars[0] = new Car(700, 2950, 0, "right", "taxi");
+
+        npcObjects[0] = new NPC(560, 2730, 80, 26 * 16, 42 * 16, "horizontal", 1);
+        npcObjects[1] = new NPC(850, 2730, 70, 30 * 16, 40 * 16, "vertical", 2);
+        npcObjects[2] = new NPC(1100, 2820, 60, 40 * 16, 46 * 16, "vertical", 2);
 
 
         Image grassImage = new Image(
-                getClass().getResource("/tiles/ground/grass.png").toExternalForm());
+                getClass().getResource("/legacy_tiles/ground/grass.png").toExternalForm());
 
         Image roadHorizontalImage = new Image(
-                getClass().getResource("/tiles/roads/road_horizontal.png").toExternalForm()
+                getClass().getResource("/legacy_tiles/roads/road_horizontal.png").toExternalForm()
         );
 
         Image sideWalkImage = new Image(
-                getClass().getResource("/tiles/roads/sidewalk.png").toExternalForm()
+                getClass().getResource("/legacy_tiles/roads/sidewalk.png").toExternalForm()
         );
 
         Image intersectionImage = new Image(
-                getClass().getResource("/tiles/roads/intersection.png").toExternalForm()
+                getClass().getResource("/legacy_tiles/roads/intersection.png").toExternalForm()
         );
 
         Image roadVerticalImage = new Image(
-                getClass().getResource("/tiles/roads/road_vertical.png").toExternalForm()
+                getClass().getResource("/legacy_tiles/roads/road_vertical.png").toExternalForm()
+        );
+
+        Image roadCornerBLImage = new Image(
+                getClass().getResource("/legacy_tiles/roads/corner_bl.png").toExternalForm()
+        );
+
+        Image roadCornerBRImage = new Image(
+                getClass().getResource("/legacy_tiles/roads/corner_br.png").toExternalForm()
+        );
+
+        Image roadCornerTLImage = new Image(
+                getClass().getResource("/legacy_tiles/roads/corner_tl.png").toExternalForm()
+        );
+
+        Image roadCornerTRImage = new Image(
+                getClass().getResource("/legacy_tiles/roads/corner_tr.png").toExternalForm()
+        );
+
+        Image sidewalkCornerBLImage = new Image(
+                getClass().getResource("/legacy_tiles/roads/sidewalk_corner_bl.png").toExternalForm()
+        );
+
+        Image sidewalkCornerBRImage = new Image(
+                getClass().getResource("/legacy_tiles/roads/sidewalk_corner_br.png").toExternalForm()
+        );
+
+        Image sidewalkCornerTLImage = new Image(
+                getClass().getResource("/legacy_tiles/roads/sidewalk_corner_tl.png").toExternalForm()
+        );
+
+        Image sidewalkCornerTRImage = new Image(
+                getClass().getResource("/legacy_tiles/roads/sidewalk_corner_tr.png").toExternalForm()
         );
 
         Image roofImage = new Image(
-                getClass().getResource("/tiles/buildings/roof.png").toExternalForm()
+                getClass().getResource("/legacy_tiles/buildings/roof.png").toExternalForm()
         );
 
         Image wallImage = new Image(
-                getClass().getResource("/tiles/buildings/wall.png").toExternalForm()
+                getClass().getResource("/legacy_tiles/buildings/wall.png").toExternalForm()
         );
 
         Image treeImage = new Image(
-                getClass().getResource("/tiles/props/tree.png").toExternalForm()
+                getClass().getResource("/legacy_tiles/props/tree.png").toExternalForm()
         );
 
         Image streetlightImage = new Image(
-                getClass().getResource("/tiles/props/streetlight.png").toExternalForm()
+                getClass().getResource("/legacy_tiles/props/streetlight.png").toExternalForm()
         );
 
         Image hydrantImage = new Image(
-                getClass().getResource("/tiles/props/hydrant.png").toExternalForm()
+                getClass().getResource("/legacy_tiles/props/hydrant.png").toExternalForm()
         );
 
         Image benchImage = new Image(
-                getClass().getResource("/tiles/props/bench.png").toExternalForm()
+                getClass().getResource("/legacy_tiles/props/bench.png").toExternalForm()
         );
 
         Image trashcanImage = new Image(
-                getClass().getResource("/tiles/props/trashcan.png").toExternalForm()
+                getClass().getResource("/legacy_tiles/props/trashcan.png").toExternalForm()
         );
 
         Image taxiImage = new Image(
-                getClass().getResource("/tiles/vehicles/taxi/taxi_frame_01.png").toExternalForm()
+                getClass().getResource("/legacy_tiles/vehicles/taxi/taxi_frame_01.png").toExternalForm()
         );
 
         playerUpIdle = new Image(
-                getClass().getResource("/tiles/characters/player/up/player_up_idle_1.png").toExternalForm()
+                getClass().getResource("/legacy_tiles/characters/player/up/player_up_idle_1.png").toExternalForm()
         );
 
         playerDownIdle = new Image(
-                getClass().getResource("/tiles/characters/player/down/player_down_idle_1.png").toExternalForm()
+                getClass().getResource("/legacy_tiles/characters/player/down/player_down_idle_1.png").toExternalForm()
         );
 
         playerLeftIdle = new Image(
-                getClass().getResource("/tiles/characters/player/left/player_left_idle_1.png").toExternalForm()
+                getClass().getResource("/legacy_tiles/characters/player/left/player_left_idle_1.png").toExternalForm()
         );
 
         playerRightIdle = new Image(
-                getClass().getResource("/tiles/characters/player/right/player_right_idle_1.png").toExternalForm()
+                getClass().getResource("/legacy_tiles/characters/player/right/player_right_idle_1.png").toExternalForm()
         );
 
         for (int i = 0; i < 5; i++) {
             playerUpWalk[i] = new Image(
-                    getClass().getResource("/tiles/characters/player/up/player_up_walk_" + (i + 1) + ".png").toExternalForm()
+                    getClass().getResource("/legacy_tiles/characters/player/up/player_up_walk_" + (i + 1) + ".png").toExternalForm()
             );
 
             playerDownWalk[i] = new Image(
-                    getClass().getResource("/tiles/characters/player/down/player_down_walk_" + (i + 1) + ".png").toExternalForm()
+                    getClass().getResource("/legacy_tiles/characters/player/down/player_down_walk_" + (i + 1) + ".png").toExternalForm()
             );
 
             playerLeftWalk[i] = new Image(
-                    getClass().getResource("/tiles/characters/player/left/player_left_walk_" + (i + 1) + ".png").toExternalForm()
+                    getClass().getResource("/legacy_tiles/characters/player/left/player_left_walk_" + (i + 1) + ".png").toExternalForm()
             );
 
             playerRightWalk[i] = new Image(
-                    getClass().getResource("/tiles/characters/player/right/player_right_walk_" + (i + 1) + ".png").toExternalForm()
+                    getClass().getResource("/legacy_tiles/characters/player/right/player_right_walk_" + (i + 1) + ".png").toExternalForm()
             );
         }
 
         npcUpIdle = new Image(
-                getClass().getResource("/tiles/characters/npc/civilian/up/civilian_up_idle_1.png").toExternalForm()
+                getClass().getResource("/legacy_tiles/characters/npc/civilian/up/civilian_up_idle_1.png").toExternalForm()
         );
 
         npcDownIdle = new Image(
-                getClass().getResource("/tiles/characters/npc/civilian/down/civilian_down_idle_1.png").toExternalForm()
+                getClass().getResource("/legacy_tiles/characters/npc/civilian/down/civilian_down_idle_1.png").toExternalForm()
         );
 
         npcLeftIdle = new Image(
-                getClass().getResource("/tiles/characters/npc/civilian/left/civilian_left_idle_1.png").toExternalForm()
+                getClass().getResource("/legacy_tiles/characters/npc/civilian/left/civilian_left_idle_1.png").toExternalForm()
         );
 
         npcRightIdle = new Image(
-                getClass().getResource("/tiles/characters/npc/civilian/right/civilian_right_idle_1.png").toExternalForm()
+                getClass().getResource("/legacy_tiles/characters/npc/civilian/right/civilian_right_idle_1.png").toExternalForm()
         );
 
         for (int i = 0; i < 4; i++) {
             npcUpWalk[i] = new Image(
-                    getClass().getResource("/tiles/characters/npc/civilian/up/civilian_up_walk_" + (i + 1) + ".png").toExternalForm()
+                    getClass().getResource("/legacy_tiles/characters/npc/civilian/up/civilian_up_walk_" + (i + 1) + ".png").toExternalForm()
             );
 
             npcDownWalk[i] = new Image(
-                    getClass().getResource("/tiles/characters/npc/civilian/down/civilian_down_walk_" + (i + 1) + ".png").toExternalForm()
+                    getClass().getResource("/legacy_tiles/characters/npc/civilian/down/civilian_down_walk_" + (i + 1) + ".png").toExternalForm()
             );
 
             npcLeftWalk[i] = new Image(
-                    getClass().getResource("/tiles/characters/npc/civilian/left/civilian_left_walk_" + (i + 1) + ".png").toExternalForm()
+                    getClass().getResource("/legacy_tiles/characters/npc/civilian/left/civilian_left_walk_" + (i + 1) + ".png").toExternalForm()
             );
 
             npcRightWalk[i] = new Image(
-                    getClass().getResource("/tiles/characters/npc/civilian/right/civilian_right_walk_" + (i + 1) + ".png").toExternalForm()
+                    getClass().getResource("/legacy_tiles/characters/npc/civilian/right/civilian_right_walk_" + (i + 1) + ".png").toExternalForm()
             );
         }
 
@@ -733,186 +785,330 @@ public class Main extends Application {
         world.getTransforms().add(new Scale(2, 2, 0, 0));
         buildingOverlay.getTransforms().add(new Scale(2, 2, 0, 0));
 
-        for (int row = 0; row < map.length; row++) {
-            for (int column = 0; column < map[row].length; column++) {
 
-                boolean horizontalRoad = row >= 12 && row < 16
-                        || row >= 32 && row < 36;
-
-                boolean verticalRoad = column >= 20 && column < 24
-                        || column >= 44 && column < 48;
-
-                boolean horizontalSidewalk = row >= 10 && row < 12
-                        || row >= 16 && row < 18
-                        || row >= 30 && row < 32
-                        || row >= 36 && row < 38;
-
-                boolean verticalSidewalk = column >= 18 && column < 20
-                        || column >= 24 && column < 26
-                        || column >= 42 && column < 44
-                        || column >= 48 && column < 50;
-
-                boolean buildingArea =
-                        // Top-left district
-                        (row >= 4 && row < 8 && column >= 4 && column < 8)
-                                || (row >= 4 && row < 8 && column >= 12 && column < 16)
-
-                                // Top-middle district
-                                || (row >= 4 && row < 8 && column >= 28 && column < 32)
-                                || (row >= 4 && row < 8 && column >= 36 && column < 40)
-
-                                // Top-right district
-                                || (row >= 4 && row < 8 && column >= 52 && column < 56)
-
-                                // Middle-left district
-                                || (row >= 22 && row < 26 && column >= 4 && column < 8)
-                                || (row >= 22 && row < 26 && column >= 12 && column < 16)
-
-                                // Middle-right district
-                                || (row >= 22 && row < 26 && column >= 28 && column < 32)
-                                || (row >= 22 && row < 26 && column >= 36 && column < 40)
-                                || (row >= 22 && row < 26 && column >= 52 && column < 56)
-
-                                // Bottom-left district
-                                || (row >= 40 && row < 44 && column >= 4 && column < 8)
-                                || (row >= 40 && row < 44 && column >= 12 && column < 16)
-
-                                // Bottom-right district
-                                || (row >= 40 && row < 44 && column >= 28 && column < 32)
-                                || (row >= 40 && row < 44 && column >= 36 && column < 40)
-                                || (row >= 40 && row < 44 && column >= 52 && column < 56);
-
-                if (horizontalRoad && verticalRoad) {
-                    map[row][column] = INTERSECTION;
-                } else if (horizontalRoad) {
-                    map[row][column] = ROAD_HORIZONTAL;
-                } else if (verticalRoad) {
-                    map[row][column] = ROAD_VERTICAL;
-                } else if (horizontalSidewalk || verticalSidewalk) {
-                    map[row][column] = SIDEWALK;
-                } else if (buildingArea) {
-                    map[row][column] = BUILDING;
-                } else {
-                    map[row][column] = GRASS;
-                }
-            }
-        }
-
-        for (int row = 0; row < map.length; row++) {
-            for (int column = 0; column < map[row].length; column++) {
-                if (map[row][column] == GRASS) {
-                    Rectangle grassTile = new Rectangle(column * 16, row * 16, 16, 16);
-                    grassTile.setFill(new ImagePattern(grassImage));
-                    world.getChildren().add(grassTile);
-                }
-
-                if (map[row][column] == ROAD_HORIZONTAL) {
-
-                    ImageView roadTile = new ImageView(roadHorizontalImage);
-
-                    roadTile.setX(column * 16);
-                    roadTile.setY(row * 16);
-                    roadTile.setFitWidth(16);
-                    roadTile.setFitHeight(16);
-                    world.getChildren().add(roadTile);
-                }
-
-                if (map[row][column] == ROAD_VERTICAL) {
-
-                    ImageView roadTile = new ImageView(roadVerticalImage);
-
-                    roadTile.setX(column * 16);
-                    roadTile.setY(row * 16);
-                    roadTile.setFitWidth(16);
-                    roadTile.setFitHeight(16);
-                    world.getChildren().add(roadTile);
-                }
-
-                if (map[row][column] == SIDEWALK) {
-                    ImageView sideWalkTile = new ImageView(sideWalkImage);
-                    sideWalkTile.setX(column * 16);
-                    sideWalkTile.setY(row * 16);
-                    sideWalkTile.setFitWidth(16);
-                    sideWalkTile.setFitHeight(16);
-                    world.getChildren().add(sideWalkTile);
-                }
-
-                if (map[row][column] == INTERSECTION) {
-                    ImageView intersectionTile = new ImageView(intersectionImage);
-                    intersectionTile.setX(column * 16);
-                    intersectionTile.setY(row * 16);
-                    intersectionTile.setFitWidth(16);
-                    intersectionTile.setFitHeight(16);
-                    world.getChildren().add(intersectionTile);
-                }
-
-                if (map[row][column] == BUILDING
-                        && (row == 0 || map[row - 1][column] != BUILDING)
-                        && (column == 0 || map[row][column - 1] != BUILDING)) {
-                    addBuilding(world, buildingOverlay, roofImage, wallImage, column, row);
-                }
-            }
-        }
-
-        // Trees
-        addProp(world, treeImage, 2, 2, 32, 32);
-        addProp(world, treeImage, 9, 9, 32, 32);
-        addProp(world, treeImage, 17, 6, 32, 32);
-        addProp(world, treeImage, 27, 9, 32, 32);
-        addProp(world, treeImage, 34, 5, 32, 32);
-        addProp(world, treeImage, 41, 9, 32, 32);
-        addProp(world, treeImage, 53, 9, 32, 32);
-        addProp(world, treeImage, 60, 5, 32, 32);
-
-        addProp(world, treeImage, 2, 27, 32, 32);
-        addProp(world, treeImage, 9, 29, 32, 32);
-        addProp(world, treeImage, 17, 25, 32, 32);
-        addProp(world, treeImage, 27, 28, 32, 32);
-        addProp(world, treeImage, 34, 27, 32, 32);
-        addProp(world, treeImage, 41, 24, 32, 32);
-        addProp(world, treeImage, 53, 28, 32, 32);
-        addProp(world, treeImage, 60, 24, 32, 32);
-
-        addProp(world, treeImage, 2, 46, 32, 32);
-        addProp(world, treeImage, 9, 42, 32, 32);
-        addProp(world, treeImage, 17, 46, 32, 32);
-        addProp(world, treeImage, 27, 47, 32, 32);
-        addProp(world, treeImage, 34, 45, 32, 32);
-        addProp(world, treeImage, 41, 47, 32, 32);
-        addProp(world, treeImage, 53, 46, 32, 32);
-        addProp(world, treeImage, 60, 42, 32, 32);
-
-        // Streetlights
-        addProp(world, streetlightImage, 18, 10, 16, 32);
-        addProp(world, streetlightImage, 24, 10, 16, 32);
-        addProp(world, streetlightImage, 42, 10, 16, 32);
-        addProp(world, streetlightImage, 48, 10, 16, 32);
-
-        addProp(world, streetlightImage, 18, 18, 16, 32);
-        addProp(world, streetlightImage, 24, 18, 16, 32);
-        addProp(world, streetlightImage, 42, 18, 16, 32);
-        addProp(world, streetlightImage, 48, 18, 16, 32);
-
-        addProp(world, streetlightImage, 18, 30, 16, 32);
-        addProp(world, streetlightImage, 24, 30, 16, 32);
-        addProp(world, streetlightImage, 42, 30, 16, 32);
-        addProp(world, streetlightImage, 48, 30, 16, 32);
-
-        addProp(world, streetlightImage, 18, 38, 16, 32);
-        addProp(world, streetlightImage, 24, 38, 16, 32);
-        addProp(world, streetlightImage, 42, 38, 16, 32);
-        addProp(world, streetlightImage, 48, 38, 16, 32);
-
-        // Hydrants
-        addProp(world, hydrantImage, 19, 11, 16, 16);
-        addProp(world, hydrantImage, 25, 17, 16, 16);
-        addProp(world, hydrantImage, 43, 11, 16, 16);
-        addProp(world, hydrantImage, 49, 17, 16, 16);
-
-        addProp(world, hydrantImage, 19, 31, 16, 16);
-        addProp(world, hydrantImage, 25, 37, 16, 16);
-        addProp(world, hydrantImage, 43, 31, 16, 16);
-        addProp(world, hydrantImage, 49, 37, 16, 16);
+//// 1. Fill the map with grass first
+//        for (int row = 0; row < map.length; row++) {
+//            for (int column = 0; column < map[row].length; column++) {
+//                map[row][column] = GRASS;
+//            }
+//        }
+//
+//// 2. Main horizontal avenue
+//        for (int row = 38; row < 42; row++) {
+//            for (int column = 0; column < 96; column++) {
+//                map[row][column] = ROAD_HORIZONTAL;
+//            }
+//        }
+//
+//// 3. Main vertical avenue
+//        for (int row = 0; row < 80; row++) {
+//            for (int column = 46; column < 50; column++) {
+//                map[row][column] = ROAD_VERTICAL;
+//            }
+//        }
+//
+//// 4. Secondary horizontal streets
+//        for (int row = 18; row < 22; row++) {
+//            for (int column = 4; column < 92; column++) {
+//                map[row][column] = ROAD_HORIZONTAL;
+//            }
+//        }
+//
+//        for (int row = 60; row < 64; row++) {
+//            for (int column = 4; column < 92; column++) {
+//                map[row][column] = ROAD_HORIZONTAL;
+//            }
+//        }
+//
+//// 5. Secondary vertical streets
+//        for (int row = 4; row < 76; row++) {
+//            for (int column = 18; column < 22; column++) {
+//                map[row][column] = ROAD_VERTICAL;
+//            }
+//        }
+//
+//        for (int row = 4; row < 76; row++) {
+//            for (int column = 74; column < 78; column++) {
+//                map[row][column] = ROAD_VERTICAL;
+//            }
+//        }
+//
+//// 6. Sidewalks beside the main avenues
+//        for (int row = 36; row < 38; row++) {
+//            for (int column = 0; column < 96; column++) {
+//                map[row][column] = SIDEWALK;
+//            }
+//        }
+//
+//        for (int row = 42; row < 44; row++) {
+//            for (int column = 0; column < 96; column++) {
+//                map[row][column] = SIDEWALK;
+//            }
+//        }
+//
+//        for (int row = 0; row < 80; row++) {
+//            for (int column = 44; column < 46; column++) {
+//                map[row][column] = SIDEWALK;
+//            }
+//
+//            for (int column = 50; column < 52; column++) {
+//                map[row][column] = SIDEWALK;
+//            }
+//        }
+//
+//// 7. Sidewalks beside secondary streets
+//        for (int column = 4; column < 92; column++) {
+//            for (int row = 16; row < 18; row++) {
+//                map[row][column] = SIDEWALK;
+//            }
+//
+//            for (int row = 22; row < 24; row++) {
+//                map[row][column] = SIDEWALK;
+//            }
+//
+//            for (int row = 58; row < 60; row++) {
+//                map[row][column] = SIDEWALK;
+//            }
+//
+//            for (int row = 64; row < 66; row++) {
+//                map[row][column] = SIDEWALK;
+//            }
+//        }
+//
+//        for (int row = 4; row < 76; row++) {
+//            for (int column = 16; column < 18; column++) {
+//                map[row][column] = SIDEWALK;
+//            }
+//
+//            for (int column = 22; column < 24; column++) {
+//                map[row][column] = SIDEWALK;
+//            }
+//
+//            for (int column = 72; column < 74; column++) {
+//                map[row][column] = SIDEWALK;
+//            }
+//
+//            for (int column = 78; column < 80; column++) {
+//                map[row][column] = SIDEWALK;
+//            }
+//        }
+//
+//// 8. Mark intersections
+//        for (int row = 0; row < 80; row++) {
+//            for (int column = 0; column < 96; column++) {
+//                boolean horizontal =
+//                        map[row][column] == ROAD_HORIZONTAL;
+//
+//                boolean vertical =
+//                        map[row][column] == ROAD_VERTICAL;
+//
+//                if (horizontal && vertical) {
+//                    map[row][column] = INTERSECTION;
+//                }
+//            }
+//        }
+//
+//// 9. Central park
+//        for (int row = 24; row < 36; row++) {
+//            for (int column = 54; column < 72; column++) {
+//                map[row][column] = GRASS;
+//            }
+//        }
+//
+//// 10. Place individual buildings (4 × 4 tiles each)
+//        int[][] buildingPositions = {
+//                // Northwest residential
+//                {4, 4}, {9, 4}, {4, 10}, {9, 10},
+//                {26, 4}, {31, 4}, {26, 10}, {31, 10},
+//
+//                // Southwest residential
+//                {4, 26}, {9, 26}, {26, 26}, {31, 26},
+//                {4, 46}, {9, 46}, {26, 46}, {31, 46},
+//                {4, 68}, {9, 68}, {26, 68}, {31, 68},
+//
+//                // Eastern commercial district
+//                {54, 4}, {63, 4}, {82, 4}, {87, 4},
+//                {54, 10}, {63, 10}, {82, 10}, {87, 10},
+//                {82, 26}, {87, 26},
+//                {82, 46}, {87, 46},
+//                {82, 68}, {87, 68}
+//        };
+//
+//        for (int i = 0; i < buildingPositions.length; i++) {
+//            int startColumn = buildingPositions[i][0];
+//            int startRow = buildingPositions[i][1];
+//
+//            for (int row = 0; row < 4; row++) {
+//                for (int column = 0; column < 4; column++) {
+//                    map[startRow + row][startColumn + column] = BUILDING;
+//                }
+//            }
+//        }
+//
+//
+//        for (int row = 0; row < map.length; row++) {
+//            for (int column = 0; column < map[row].length; column++) {
+//                if (map[row][column] == GRASS) {
+//                    Rectangle grassTile = new Rectangle(column * 16, row * 16, 16, 16);
+//                    grassTile.setFill(new ImagePattern(grassImage));
+//                    world.getChildren().add(grassTile);
+//                }
+//
+//                if (map[row][column] == ROAD_HORIZONTAL) {
+//
+//                    ImageView roadTile = new ImageView(roadHorizontalImage);
+//
+//                    roadTile.setX(column * 16);
+//                    roadTile.setY(row * 16);
+//                    roadTile.setFitWidth(16);
+//                    roadTile.setFitHeight(16);
+//                    world.getChildren().add(roadTile);
+//                }
+//
+//                if (map[row][column] == ROAD_VERTICAL) {
+//
+//                    ImageView roadTile = new ImageView(roadVerticalImage);
+//
+//                    roadTile.setX(column * 16);
+//                    roadTile.setY(row * 16);
+//                    roadTile.setFitWidth(16);
+//                    roadTile.setFitHeight(16);
+//                    world.getChildren().add(roadTile);
+//                }
+//
+//                if (map[row][column] == SIDEWALK) {
+//                    ImageView sideWalkTile = new ImageView(sideWalkImage);
+//                    sideWalkTile.setX(column * 16);
+//                    sideWalkTile.setY(row * 16);
+//                    sideWalkTile.setFitWidth(16);
+//                    sideWalkTile.setFitHeight(16);
+//                    world.getChildren().add(sideWalkTile);
+//                }
+//
+//                if (map[row][column] == INTERSECTION) {
+//                    ImageView intersectionTile = new ImageView(intersectionImage);
+//                    intersectionTile.setX(column * 16);
+//                    intersectionTile.setY(row * 16);
+//                    intersectionTile.setFitWidth(16);
+//                    intersectionTile.setFitHeight(16);
+//                    world.getChildren().add(intersectionTile);
+//                }
+//                else if (map[row][column] == ROAD_CORNER_BL) {
+//                    ImageView tile = new ImageView(roadCornerBLImage);
+//                    tile.setX(column * 16);
+//                    tile.setY(row * 16);
+//                    world.getChildren().add(tile);
+//                }
+//                else if (map[row][column] == ROAD_CORNER_BR) {
+//                    ImageView tile = new ImageView(roadCornerBRImage);
+//                    tile.setX(column * 16);
+//                    tile.setY(row * 16);
+//                    world.getChildren().add(tile);
+//                }
+//                else if (map[row][column] == ROAD_CORNER_TL) {
+//                    ImageView tile = new ImageView(roadCornerTLImage);
+//                    tile.setX(column * 16);
+//                    tile.setY(row * 16);
+//                    world.getChildren().add(tile);
+//                }
+//                else if (map[row][column] == ROAD_CORNER_TR) {
+//                    ImageView tile = new ImageView(roadCornerTRImage);
+//                    tile.setX(column * 16);
+//                    tile.setY(row * 16);
+//                    world.getChildren().add(tile);
+//                }
+//                else if (map[row][column] == SIDEWALK_CORNER_BL) {
+//                    ImageView tile = new ImageView(sidewalkCornerBLImage);
+//                    tile.setX(column * 16);
+//                    tile.setY(row * 16);
+//                    world.getChildren().add(tile);
+//                }
+//                else if (map[row][column] == SIDEWALK_CORNER_BR) {
+//                    ImageView tile = new ImageView(sidewalkCornerBRImage);
+//                    tile.setX(column * 16);
+//                    tile.setY(row * 16);
+//                    world.getChildren().add(tile);
+//                }
+//                else if (map[row][column] == SIDEWALK_CORNER_TL) {
+//                    ImageView tile = new ImageView(sidewalkCornerTLImage);
+//                    tile.setX(column * 16);
+//                    tile.setY(row * 16);
+//                    world.getChildren().add(tile);
+//                }
+//                else if (map[row][column] == SIDEWALK_CORNER_TR) {
+//                    ImageView tile = new ImageView(sidewalkCornerTRImage);
+//                    tile.setX(column * 16);
+//                    tile.setY(row * 16);
+//                    world.getChildren().add(tile);
+//                }
+//
+//                if (map[row][column] == BUILDING
+//                        && (row == 0 || map[row - 1][column] != BUILDING)
+//                        && (column == 0 || map[row][column - 1] != BUILDING)) {
+//                    addBuilding(world, buildingOverlay, roofImage, wallImage, column, row);
+//                }
+//            }
+//        }
+//
+//        // Trees
+//        addProp(world, treeImage, 2, 2, 32, 32);
+//        addProp(world, treeImage, 9, 9, 32, 32);
+//        addProp(world, treeImage, 17, 6, 32, 32);
+//        addProp(world, treeImage, 27, 9, 32, 32);
+//        addProp(world, treeImage, 34, 5, 32, 32);
+//        addProp(world, treeImage, 41, 9, 32, 32);
+//        addProp(world, treeImage, 53, 9, 32, 32);
+//        addProp(world, treeImage, 60, 5, 32, 32);
+//
+//        addProp(world, treeImage, 2, 27, 32, 32);
+//        addProp(world, treeImage, 9, 29, 32, 32);
+//        addProp(world, treeImage, 17, 25, 32, 32);
+//        addProp(world, treeImage, 27, 28, 32, 32);
+//        addProp(world, treeImage, 34, 27, 32, 32);
+//        addProp(world, treeImage, 41, 24, 32, 32);
+//        addProp(world, treeImage, 53, 28, 32, 32);
+//        addProp(world, treeImage, 60, 24, 32, 32);
+//
+//        addProp(world, treeImage, 2, 46, 32, 32);
+//        addProp(world, treeImage, 9, 42, 32, 32);
+//        addProp(world, treeImage, 17, 46, 32, 32);
+//        addProp(world, treeImage, 27, 47, 32, 32);
+//        addProp(world, treeImage, 34, 45, 32, 32);
+//        addProp(world, treeImage, 41, 47, 32, 32);
+//        addProp(world, treeImage, 53, 46, 32, 32);
+//        addProp(world, treeImage, 60, 42, 32, 32);
+//
+//        // Streetlights
+//        addProp(world, streetlightImage, 18, 10, 16, 32);
+//        addProp(world, streetlightImage, 24, 10, 16, 32);
+//        addProp(world, streetlightImage, 42, 10, 16, 32);
+//        addProp(world, streetlightImage, 48, 10, 16, 32);
+//
+//        addProp(world, streetlightImage, 18, 18, 16, 32);
+//        addProp(world, streetlightImage, 24, 18, 16, 32);
+//        addProp(world, streetlightImage, 42, 18, 16, 32);
+//        addProp(world, streetlightImage, 48, 18, 16, 32);
+//
+//        addProp(world, streetlightImage, 18, 30, 16, 32);
+//        addProp(world, streetlightImage, 24, 30, 16, 32);
+//        addProp(world, streetlightImage, 42, 30, 16, 32);
+//        addProp(world, streetlightImage, 48, 30, 16, 32);
+//
+//        addProp(world, streetlightImage, 18, 38, 16, 32);
+//        addProp(world, streetlightImage, 24, 38, 16, 32);
+//        addProp(world, streetlightImage, 42, 38, 16, 32);
+//        addProp(world, streetlightImage, 48, 38, 16, 32);
+//
+//        // Hydrants
+//        addProp(world, hydrantImage, 19, 11, 16, 16);
+//        addProp(world, hydrantImage, 25, 17, 16, 16);
+//        addProp(world, hydrantImage, 43, 11, 16, 16);
+//        addProp(world, hydrantImage, 49, 17, 16, 16);
+//
+//        addProp(world, hydrantImage, 19, 31, 16, 16);
+//        addProp(world, hydrantImage, 25, 37, 16, 16);
+//        addProp(world, hydrantImage, 43, 31, 16, 16);
+//        addProp(world, hydrantImage, 49, 37, 16, 16);
 
         stage.setScene(scene);
         stage.setTitle("Mini GTA");
