@@ -13,6 +13,8 @@ import javafx.scene.image.ImageView;
 import javafx.scene.shape.Rectangle;
 import javafx.scene.Group;
 import javafx.scene.paint.Color;
+import javafx.scene.shape.Line;
+import javafx.geometry.Point2D;
 
 import java.lang.Math;
 
@@ -127,6 +129,7 @@ public class Main extends Application {
     private Image[] npcRightWalk = new Image[4];
 
     private Text interactionText;
+    private Text coordinateText;
 
     private Polygon carHitboxVisual;
 
@@ -142,9 +145,41 @@ public class Main extends Application {
         Group foregroundLayer = new Group();
         Group buildingOverlay = new Group();
 
-        world.getChildren().addAll(baseLayer, backgroundLayer, objectLayer, buildingOverlay, foregroundLayer);
+        Group gridLayer = new Group();
+        gridLayer.setVisible(false);
+
+        world.getChildren().addAll(baseLayer, backgroundLayer, objectLayer, buildingOverlay, foregroundLayer, gridLayer);
 
         root.getChildren().add(world);
+
+        root.setOnMouseMoved(event -> {
+            if (!editorMode) {
+                coordinateText.setVisible(false);
+                return;
+            }
+
+            Point2D mouseWorld = world.sceneToLocal(
+                    event.getSceneX(),
+                    event.getSceneY()
+            );
+
+            double mouseWorldX = mouseWorld.getX();
+            double mouseWorldY = mouseWorld.getY();
+
+            int gridX = (int) Math.floor(mouseWorldX / 8);
+            int gridY = (int) Math.floor(mouseWorldY / 8);
+
+            coordinateText.setText(
+                    String.format(
+                            "World: (%.1f, %.1f) | Grid: (%d, %d)",
+                            mouseWorldX, mouseWorldY, gridX, gridY
+                    )
+            );
+
+            coordinateText.setX(20);
+            coordinateText.setY(60);
+            coordinateText.setVisible(true);
+        });
 
         Image cityMapImage = new Image(
                 getClass().getResource("/map/base/city_map.png").toExternalForm()
@@ -159,6 +194,30 @@ public class Main extends Application {
 
         baseLayer.getChildren().add(cityMapView);
 
+        // Create editor grid
+        double gridSpacing = 4; // 8 world units after the 2x world scaling
+
+        double mapWidth = 2880;
+        double mapHeight = 1920;
+
+        // Vertical lines
+        for (double x = 0; x <= mapWidth; x += gridSpacing) {
+            Line line = new Line(x, 0, x, mapHeight);
+            line.setStroke(Color.rgb(255, 255, 255, 0.25));
+            line.setStrokeWidth(0.5);
+
+            gridLayer.getChildren().add(line);
+        }
+
+        // Horizontal lines
+        for (double y = 0; y <= mapHeight; y += gridSpacing) {
+            Line line = new Line(0, y, mapWidth, y);
+            line.setStroke(Color.rgb(255, 255, 255, 0.25));
+            line.setStrokeWidth(0.5);
+
+            gridLayer.getChildren().add(line);
+        }
+
         root.setStyle("-fx-background-color: #ffffff;");
         Scene scene = new Scene(root, 1280, 720);
 
@@ -167,6 +226,11 @@ public class Main extends Application {
         interactionText.setX(20);
         interactionText.setY(40);
         root.getChildren().add(interactionText);
+
+        coordinateText = new Text();
+        coordinateText.setFill(Color.WHITE);
+        coordinateText.setVisible(false);
+        root.getChildren().add(coordinateText);
 
         Text modeText = new Text("PLAY MODE");
         modeText.setLayoutX(20);
@@ -248,6 +312,8 @@ public class Main extends Application {
 
                 deltaTime = (now - lastTime) / 1_000_000_000.0;
                 lastTime = now;
+
+                gridLayer.setVisible(editorMode);
 
                 if (!editorMode && !isDriving) {
                     double dx = 0;
