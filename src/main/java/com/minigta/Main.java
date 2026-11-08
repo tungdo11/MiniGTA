@@ -3,6 +3,7 @@ package com.minigta;
 import javafx.animation.AnimationTimer;
 import javafx.application.Application;
 import javafx.scene.Scene;
+import javafx.scene.input.MouseButton;
 import javafx.scene.layout.Pane;
 import javafx.scene.shape.Polygon;
 import javafx.scene.text.Text;
@@ -15,6 +16,11 @@ import javafx.scene.Group;
 import javafx.scene.paint.Color;
 import javafx.scene.shape.Line;
 import javafx.geometry.Point2D;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.List;
+import java.util.ArrayList;
 
 import java.lang.Math;
 
@@ -40,6 +46,8 @@ public class Main extends Application {
     private boolean editorMode = false;
     private boolean f1Down = false;
 
+    private boolean hasDragged = false;
+
     private boolean isDriving = false;
     private int currentCar = -1;
 
@@ -48,10 +56,14 @@ public class Main extends Application {
 
     private long lastTime = 0;
     private double deltaTime;
-    private ImageView playerIdle;
 
     private Rectangle[] buildingHitbox = new Rectangle[50];
     private int buildingCount = 0;
+
+    private Rectangle[] buildingHitboxVisual = new Rectangle[50];
+    private int selectedHitboxIndex = -1;
+
+    private Rectangle hoverTile;
 
     private static final double HITBOX_OFFSET_X = 8;
     private static final double HITBOX_OFFSET_Y = 18;
@@ -80,23 +92,8 @@ public class Main extends Application {
 
     private static double cameraX = 0;
     private static double cameraY = 0;
-
-    private static final int GRASS = 0;
-    private static final int ROAD_HORIZONTAL = 1;
-    private static final int ROAD_VERTICAL = 2;
-    private static final int SIDEWALK = 3;
-    private static final int INTERSECTION = 4;
-    private static final int BUILDING = 5;
-
-    private static final int ROAD_CORNER_BL = 6;
-    private static final int ROAD_CORNER_BR = 7;
-    private static final int ROAD_CORNER_TL = 8;
-    private static final int ROAD_CORNER_TR = 9;
-
-    private static final int SIDEWALK_CORNER_BL = 10;
-    private static final int SIDEWALK_CORNER_BR = 11;
-    private static final int SIDEWALK_CORNER_TL = 12;
-    private static final int SIDEWALK_CORNER_TR = 13;
+    private double tileX = 0;
+    private double tileY = 0;
 
     private int[][] map = new int[96][144];
 
@@ -130,8 +127,16 @@ public class Main extends Application {
 
     private Text interactionText;
     private Text coordinateText;
+    private Text capturedCoordinateText;
 
     private Polygon carHitboxVisual;
+
+    private boolean drawingHitbox = false;
+
+    private double hitboxStartX;
+    private double hitboxStartY;
+
+    private Rectangle hitboxPreview;
 
     @Override
     public void start(Stage stage) {
@@ -155,6 +160,7 @@ public class Main extends Application {
         root.setOnMouseMoved(event -> {
             if (!editorMode) {
                 coordinateText.setVisible(false);
+                hoverTile.setVisible(false);
                 return;
             }
 
@@ -166,8 +172,8 @@ public class Main extends Application {
             double mouseWorldX = mouseWorld.getX();
             double mouseWorldY = mouseWorld.getY();
 
-            int gridX = (int) Math.floor(mouseWorldX / 8);
-            int gridY = (int) Math.floor(mouseWorldY / 8);
+            int gridX = (int) Math.floor(mouseWorldX / 4);
+            int gridY = (int) Math.floor(mouseWorldY / 4);
 
             coordinateText.setText(
                     String.format(
@@ -179,6 +185,210 @@ public class Main extends Application {
             coordinateText.setX(20);
             coordinateText.setY(60);
             coordinateText.setVisible(true);
+
+            tileX = Math.floor(mouseWorld.getX() / 4) * 4;
+            tileY = Math.floor(mouseWorld.getY() / 4) * 4;
+
+            hoverTile.setX(tileX);
+            hoverTile.setY(tileY);
+            hoverTile.setVisible(true);
+        });
+
+        root.setOnMouseClicked(event -> {
+            if (!editorMode || event.getButton() != MouseButton.PRIMARY) {
+                return;
+            }
+
+            if (hasDragged) {
+                hasDragged = false;
+                return;
+            }
+
+            Point2D mouseMap = world.sceneToLocal(
+                    event.getSceneX(),
+                    event.getSceneY()
+            );
+
+            double mouseWorldX = mouseMap.getX() * 2;
+            double mouseWorldY = mouseMap.getY() * 2;
+
+            // Check whether the click hits an existing hitbox
+            selectedHitboxIndex = -1;
+
+            for (int i = 0; i < buildingCount; i++) {
+                if (buildingHitboxVisual[i].contains(
+                        mouseMap.getX(), mouseMap.getY())) {
+
+                    selectedHitboxIndex = i;
+                    break;
+                }
+            }
+
+            // Highlight the selected hitbox
+            for (int i = 0; i < buildingCount; i++) {
+                if (i == selectedHitboxIndex) {
+                    buildingHitboxVisual[i].setStroke(Color.YELLOW);
+                    buildingHitboxVisual[i].setStrokeWidth(2);
+                } else {
+                    buildingHitboxVisual[i].setStroke(Color.RED);
+                    buildingHitboxVisual[i].setStrokeWidth(1);
+                }
+            }
+
+            if (selectedHitboxIndex != -1) {
+                capturedCoordinateText.setText(
+                        "Selected hitbox #" + (selectedHitboxIndex + 1)
+                                + " | Press DELETE to remove"
+                );
+                capturedCoordinateText.setVisible(true);
+                return;
+            }
+
+            // No existing hitbox was selected, so create a new one.
+            if (buildingCount >= buildingHitbox.length) {
+                capturedCoordinateText.setText("Hitbox limit reached!");
+                return;
+            }
+
+            double gridSpacing = 4;
+
+            // Snap the position to the top-left corner of the grid cell
+            double snappedX = Math.floor(mouseMap.getX() / gridSpacing) * gridSpacing;
+            double snappedY = Math.floor(mouseMap.getY() / gridSpacing) * gridSpacing;
+
+            Rectangle visual = new Rectangle(
+                    snappedX,
+                    snappedY,
+                    gridSpacing,
+                    gridSpacing
+            );
+
+            visual.setFill(Color.rgb(255, 0, 0, 0.25));
+            visual.setStroke(Color.RED);
+            visual.setStrokeWidth(1);
+
+            Rectangle collision = new Rectangle(
+                    visual.getX() * 2,
+                    visual.getY() * 2,
+                    visual.getWidth() * 2,
+                    visual.getHeight() * 2
+            );
+
+            gridLayer.getChildren().add(visual);
+
+            buildingHitbox[buildingCount] = collision;
+            buildingHitboxVisual[buildingCount] = visual;
+
+            buildingCount++;
+
+            saveHitboxes();
+
+            capturedCoordinateText.setText("Created hitbox #" + buildingCount);
+        });
+
+        root.setOnMousePressed(event -> {
+            hasDragged = false;
+
+            if (!editorMode || event.getButton() != MouseButton.PRIMARY) {
+                return;
+            }
+
+            Point2D mouseWorld = world.sceneToLocal(
+                    event.getSceneX(),
+                    event.getSceneY()
+            );
+
+            hitboxStartX = mouseWorld.getX();
+            hitboxStartY = mouseWorld.getY();
+
+            drawingHitbox = true;
+
+            hitboxPreview.setX(hitboxStartX);
+            hitboxPreview.setY(hitboxStartY);
+            hitboxPreview.setWidth(0);
+            hitboxPreview.setHeight(0);
+            hitboxPreview.setVisible(true);
+        });
+
+        root.setOnMouseDragged(event -> {
+            hasDragged = true;
+
+            if (!editorMode || !drawingHitbox) {
+                return;
+            }
+
+            Point2D mouseWorld = world.sceneToLocal(
+                    event.getSceneX(),
+                    event.getSceneY()
+            );
+
+            double currentX = mouseWorld.getX();
+            double currentY = mouseWorld.getY();
+
+            double left = Math.min(hitboxStartX, currentX);
+            double top = Math.min(hitboxStartY, currentY);
+
+            double width = Math.abs(currentX - hitboxStartX);
+            double height = Math.abs(currentY - hitboxStartY);
+
+            hitboxPreview.setX(left);
+            hitboxPreview.setY(top);
+            hitboxPreview.setWidth(width);
+            hitboxPreview.setHeight(height);
+        });
+
+        root.setOnMouseReleased(event -> {
+            if (!drawingHitbox) {
+                return;
+            }
+
+            drawingHitbox = false;
+
+            // Ignore a normal click or an extremely small drag
+            if (hitboxPreview.getWidth() < 4 || hitboxPreview.getHeight() < 4) {
+
+                hitboxPreview.setVisible(false);
+                return;
+            }
+
+            // Check capacity before creating the permanent hitbox
+            if (buildingCount >= buildingHitbox.length) {
+                capturedCoordinateText.setText("Hitbox limit reached!");
+                capturedCoordinateText.setVisible(true);
+                hitboxPreview.setVisible(false);
+                return;
+            }
+
+// Create a permanent copy of the preview
+            Rectangle savedHitbox = new Rectangle(
+                    hitboxPreview.getX(),
+                    hitboxPreview.getY(),
+                    hitboxPreview.getWidth(),
+                    hitboxPreview.getHeight()
+            );
+
+            savedHitbox.setFill(Color.rgb(255, 0, 0, 0.25));
+            savedHitbox.setStroke(Color.RED);
+            savedHitbox.setStrokeWidth(1);
+
+            Rectangle collisionHitbox = new Rectangle(
+                    savedHitbox.getX() * 2,
+                    savedHitbox.getY() * 2,
+                    savedHitbox.getWidth() * 2,
+                    savedHitbox.getHeight() * 2
+            );
+
+            gridLayer.getChildren().add(savedHitbox);
+
+            buildingHitbox[buildingCount] = collisionHitbox;
+            buildingHitboxVisual[buildingCount] = savedHitbox;
+
+            buildingCount++;
+
+            saveHitboxes();
+
+            // Hide the reusable preview
+            hitboxPreview.setVisible(false);
         });
 
         Image cityMapImage = new Image(
@@ -232,10 +442,34 @@ public class Main extends Application {
         coordinateText.setVisible(false);
         root.getChildren().add(coordinateText);
 
+        capturedCoordinateText = new Text("Last clicked: None");
+        capturedCoordinateText.setFill(Color.YELLOW);
+        capturedCoordinateText.setVisible(false);
+        root.getChildren().add(capturedCoordinateText);
+
+        hoverTile = new Rectangle(4, 4);
+        hoverTile.setFill(Color.rgb(255, 0, 0, 0.35));
+        hoverTile.setStroke(Color.RED);
+        hoverTile.setStrokeWidth(0.5);
+        hoverTile.setVisible(false);
+
+        gridLayer.getChildren().add(hoverTile);
+
+        hitboxPreview = new Rectangle();
+
+        hitboxPreview.setFill(Color.rgb(255, 0, 0, 0.25));
+        hitboxPreview.setStroke(Color.RED);
+        hitboxPreview.setStrokeWidth(1);
+
+        hitboxPreview.setVisible(false);
+
+        gridLayer.getChildren().add(hitboxPreview);
+
         Text modeText = new Text("PLAY MODE");
         modeText.setLayoutX(20);
         modeText.setLayoutY(30);
         modeText.setStyle("-fx-font-size: 18px; -fx-fill: white;");
+        modeText.setVisible(false);
 
         root.getChildren().add(modeText);
 
@@ -270,8 +504,18 @@ public class Main extends Application {
                         editorMode = !editorMode;
                         f1Down = true;
 
-                        if (editorMode) modeText.setText("EDITOR MODE");
-                        else modeText.setText("PLAY MODE");
+                        if (editorMode) {
+                            modeText.setText("EDITOR MODE");
+                            modeText.setVisible(true);
+                        } else {
+                            modeText.setText("PLAY MODE");
+                            modeText.setVisible(false);
+                        }
+                    }
+                }
+                case DELETE -> {
+                    if (editorMode) {
+                        deleteSelectedHitbox(gridLayer);
                     }
                 }
             }
@@ -315,10 +559,10 @@ public class Main extends Application {
 
                 gridLayer.setVisible(editorMode);
 
-                if (!editorMode && !isDriving) {
+                if (!isDriving) {
                     double dx = 0;
                     double dy = 0;
-                    double speed = 200;
+                    double speed = editorMode ? 600 : 200;
 
                     if (wDown) dy--;
                     if (sDown) dy++;
@@ -352,7 +596,7 @@ public class Main extends Application {
                         }
                     }
 
-                    double movement = 200 * deltaTime;
+                    double movement = speed * deltaTime;
 
                     double length = Math.sqrt(Math.pow(dx, 2) + Math.pow(dy, 2));
 
@@ -364,15 +608,20 @@ public class Main extends Application {
                     double oldX = playerObject.getWorldX();
 
                     playerObject.moveX(dx * movement);
+
                     playerHitbox.setX(playerObject.getWorldX() + HITBOX_OFFSET_X);
+                    playerHitbox.setY(playerObject.getWorldY() + HITBOX_OFFSET_Y);
 
-                    for (Rectangle building : buildingHitbox) {
-                        if (building != null &&
-                                checkCollision(playerHitbox, building)) {
+                    if (!editorMode) {
+                        for (Rectangle building : buildingHitbox) {
+                            if (building != null && checkCollision(playerHitbox, building)) {
+                                playerObject.setWorldX(oldX);
 
-                            playerObject.setWorldX(oldX);
-                            playerHitbox.setX(playerObject.getWorldX() + HITBOX_OFFSET_X);
-                            break;
+                                playerHitbox.setX(playerObject.getWorldX() + HITBOX_OFFSET_X);
+                                playerHitbox.setY(playerObject.getWorldY() + HITBOX_OFFSET_Y);
+
+                                break;
+                            }
                         }
                     }
 
@@ -380,16 +629,17 @@ public class Main extends Application {
 
                     playerObject.moveY(dy * movement);
 
-
                     playerHitbox.setY(playerObject.getWorldY() + HITBOX_OFFSET_Y);
 
-                    for (Rectangle building : buildingHitbox) {
-                        if (building != null &&
-                                checkCollision(playerHitbox, building)) {
+                    if (!editorMode) {
+                        for (Rectangle building : buildingHitbox) {
+                            if (building != null &&
+                                    checkCollision(playerHitbox, building)) {
 
-                            playerObject.setWorldY(oldY);
-                            playerHitbox.setY(playerObject.getWorldY() + HITBOX_OFFSET_Y);
-                            break;
+                                playerObject.setWorldY(oldY);
+                                playerHitbox.setY(playerObject.getWorldY() + HITBOX_OFFSET_Y);
+                                break;
+                            }
                         }
                     }
                 }
@@ -397,27 +647,6 @@ public class Main extends Application {
                 if (!editorMode && isDriving) {
                     Car car = cars[currentCar];
                     car.setHandbrakeActive(handbrakeDown);
-
-                    int tileColumn = (int) ((car.getWorldX() + 20) / 32);
-                    int tileRow = (int) ((car.getWorldY() + 36) / 32);
-
-                    double surfaceGrip = 1.0;
-
-                    if (tileRow >= 0 && tileRow < map.length
-                            && tileColumn >= 0 && tileColumn < map[0].length) {
-
-                        int surface = map[tileRow][tileColumn];
-
-                        if (surface == GRASS) {
-                            surfaceGrip = 0.55;
-                        } else if (surface == SIDEWALK) {
-                            surfaceGrip = 0.85;
-                        } else {
-                            surfaceGrip = 1.0;
-                        }
-                    }
-
-                    car.setGrip(surfaceGrip);
 
                     boolean braking = drivingS && car.getSpeed() > 0;
 
@@ -732,6 +961,7 @@ public class Main extends Application {
         root.getChildren().add(carHitboxVisual);
 
         world.getTransforms().add(new Scale(2, 2, 0, 0));
+        loadHitboxes(gridLayer);
 
         stage.setScene(scene);
         stage.setTitle("Mini GTA");
@@ -853,5 +1083,112 @@ public class Main extends Application {
         }
 
         return true;
+    }
+
+    private void saveHitboxes() {
+        List<String> lines = new ArrayList<>();
+
+        for (int i = 0; i < buildingCount; i++) {
+            Rectangle hitbox = buildingHitbox[i];
+
+            lines.add(
+                    hitbox.getX() + "," +
+                            hitbox.getY() + "," +
+                            hitbox.getWidth() + "," +
+                            hitbox.getHeight()
+            );
+        }
+
+        Path file = Path.of(System.getProperty("user.dir"), "hitboxes.txt");
+
+        try {
+            Files.write(file, lines);
+
+            System.out.println("Hitboxes saved: " + buildingCount);
+            System.out.println("Save location: " + file.toAbsolutePath());
+
+        } catch (IOException e) {
+            System.out.println("Could not save hitboxes.");
+            e.printStackTrace();
+        }
+    }
+
+    private void loadHitboxes(Group gridLayer) {
+        Path file = Path.of(System.getProperty("user.dir"), "hitboxes.txt");
+
+        if (!Files.exists(file)) {
+            return;
+        }
+
+        try {
+            List<String> lines = Files.readAllLines(file);
+
+            for (String line : lines) {
+                String[] values = line.split(",");
+
+                if (values.length != 4 || buildingCount >= buildingHitbox.length) {
+                    continue;
+                }
+
+                double x = Double.parseDouble(values[0]);
+                double y = Double.parseDouble(values[1]);
+                double width = Double.parseDouble(values[2]);
+                double height = Double.parseDouble(values[3]);
+
+                // Restore the collision hitbox
+                buildingHitbox[buildingCount] =
+                        new Rectangle(x, y, width, height);
+
+                buildingCount++;
+
+                // Restore its editor visualization
+                Rectangle visual = new Rectangle(
+                        x / 2, y / 2, width / 2, height / 2
+                );
+
+                visual.setFill(Color.rgb(255, 0, 0, 0.25));
+                visual.setStroke(Color.RED);
+                visual.setStrokeWidth(1);
+
+                buildingHitboxVisual[buildingCount - 1] = visual;
+                gridLayer.getChildren().add(visual);
+            }
+
+            System.out.println("Hitboxes loaded: " + buildingCount);
+
+        } catch (IOException | NumberFormatException e) {
+            System.out.println("Could not load hitboxes.");
+            e.printStackTrace();
+        }
+    }
+
+    private void deleteSelectedHitbox(Group gridLayer) {
+        if (selectedHitboxIndex == -1) {
+            return;
+        }
+
+        int index = selectedHitboxIndex;
+
+        // Remove the visual rectangle
+        gridLayer.getChildren().remove(buildingHitboxVisual[index]);
+
+        // Shift remaining hitboxes to fill the empty position
+        for (int i = index; i < buildingCount - 1; i++) {
+            buildingHitbox[i] = buildingHitbox[i + 1];
+            buildingHitboxVisual[i] = buildingHitboxVisual[i + 1];
+        }
+
+        buildingCount--;
+
+        // Clear the last occupied position
+        buildingHitbox[buildingCount] = null;
+        buildingHitboxVisual[buildingCount] = null;
+
+        selectedHitboxIndex = -1;
+
+        // Update the save file
+        saveHitboxes();
+
+        capturedCoordinateText.setText("Hitbox deleted!");
     }
 }
