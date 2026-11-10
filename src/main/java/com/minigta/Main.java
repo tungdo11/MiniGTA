@@ -145,6 +145,7 @@ public class Main extends Application {
         Pane root = new Pane();
 
         Group world = new Group();
+        Group foregroundWorld = new Group();
 
         Group baseLayer = new Group();
         Group backgroundLayer = new Group();
@@ -155,7 +156,13 @@ public class Main extends Application {
         Group gridLayer = new Group();
         gridLayer.setVisible(false);
 
-        world.getChildren().addAll(baseLayer, backgroundLayer, objectLayer, buildingOverlay, foregroundLayer, gridLayer);
+        world.getChildren().addAll(
+                baseLayer,
+                backgroundLayer,
+                objectLayer,
+                buildingOverlay,
+                gridLayer
+        );
 
         root.getChildren().add(world);
 
@@ -412,8 +419,17 @@ public class Main extends Application {
                 ).toExternalForm()
         );
 
-        placeMapObject(apartmentBlue, 500, 1547, 32, 48, objectLayer);
-        placeMapObject(apartmentBlue, 600, 1547, 32, 48, objectLayer);
+        placeMapObject(
+                apartmentBlue, 500, 1547, 32, 48,
+                foregroundWorld,
+                2, 26, 28, 20
+        );
+
+        placeMapObject(
+                apartmentBlue, 600, 1547, 32, 48,
+                foregroundWorld,
+                2, 26, 28, 20
+        );
 
         // Create editor grid
         double gridSpacing = 4; // 8 world units after the 2x world scaling
@@ -704,6 +720,9 @@ public class Main extends Application {
                 world.setTranslateX(-cameraX);
                 world.setTranslateY(-cameraY);
 
+                foregroundWorld.setTranslateX(-cameraX);
+                foregroundWorld.setTranslateY(-cameraY);
+
                 player.setX(playerObject.getWorldX() + 8 - cameraX);
                 player.setY(playerObject.getWorldY() + 12 - cameraY);
 
@@ -937,6 +956,7 @@ public class Main extends Application {
         root.getChildren().add(carViews[0]);
 
         root.getChildren().add(player);
+        root.getChildren().add(foregroundWorld);
 
         // player's hitbox visuality
 //        playerHitboxVisual.setFill(javafx.scene.paint.Color.rgb(0, 0, 0, 1));
@@ -972,6 +992,7 @@ public class Main extends Application {
         root.getChildren().add(carHitboxVisual);
 
         world.getTransforms().add(new Scale(2, 2, 0, 0));
+        foregroundWorld.getTransforms().add(new Scale(2, 2, 0, 0));
         loadHitboxes(gridLayer);
 
         stage.setScene(scene);
@@ -1203,9 +1224,29 @@ public class Main extends Application {
         capturedCoordinateText.setText("Hitbox deleted!");
     }
 
-    private void placeMapObject(Image image, double x, double y, double width, double height, Group targetLayer) {
+    private void placeMapObject(
+            Image image,
+            double x,
+            double y,
+            double width,
+            double height,
+            Group targetLayer,
+            double hitboxOffsetX,
+            double hitboxOffsetY,
+            double hitboxWidth,
+            double hitboxHeight
+    ) {
         MapObject mapObject = new MapObject(
-                image, x, y, width, height, 2
+                image,
+                x,
+                y,
+                width,
+                height,
+                2,
+                hitboxOffsetX,
+                hitboxOffsetY,
+                hitboxWidth,
+                hitboxHeight
         );
 
         mapObjects.add(mapObject);

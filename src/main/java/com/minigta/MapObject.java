@@ -14,12 +14,19 @@ public class MapObject {
     private double width;
     private double height;
 
+    private double hitboxOffsetX;
+    private double hitboxOffsetY;
+    private double hitboxWidth;
+    private double hitboxHeight;
+
     private int layer;
 
     private Rectangle hitbox;
 
     public MapObject(Image image, double x, double y,
-                     double width, double height, int layer) {
+                     double width, double height, int layer,
+                     double hitboxOffsetX, double hitboxOffsetY,
+                     double hitboxWidth, double hitboxHeight) {
 
         this.x = x;
         this.y = y;
@@ -27,13 +34,23 @@ public class MapObject {
         this.height = height;
         this.layer = layer;
 
+        this.hitboxOffsetX = hitboxOffsetX;
+        this.hitboxOffsetY = hitboxOffsetY;
+        this.hitboxWidth = hitboxWidth;
+        this.hitboxHeight = hitboxHeight;
+
         imageView = new ImageView(image);
         imageView.setX(x);
         imageView.setY(y);
         imageView.setFitWidth(width);
         imageView.setFitHeight(height);
 
-        hitbox = new Rectangle(x, y, width, height);
+        hitbox = new Rectangle(
+                x + hitboxOffsetX,
+                y + hitboxOffsetY,
+                hitboxWidth,
+                hitboxHeight
+        );
     }
 
     public ImageView getImageView() {
@@ -47,8 +64,8 @@ public class MapObject {
         imageView.setX(x);
         imageView.setY(y);
 
-        hitbox.setX(x);
-        hitbox.setY(y);
+        hitbox.setX(x + hitboxOffsetX);
+        hitbox.setY(y + hitboxOffsetY);
     }
 
     public double getX() {
