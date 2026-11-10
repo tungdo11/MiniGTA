@@ -90,6 +90,8 @@ public class Main extends Application {
 
     private Player playerObject;
 
+    private final List<MapObject> mapObjects = new ArrayList<>();
+
     private static double cameraX = 0;
     private static double cameraY = 0;
     private double tileX = 0;
@@ -403,6 +405,15 @@ public class Main extends Application {
         cityMapView.setSmooth(false);
 
         baseLayer.getChildren().add(cityMapView);
+
+        Image apartmentBlue = new Image(
+                getClass().getResource(
+                        "/map/objects/buildings/apartment_blue.png"
+                ).toExternalForm()
+        );
+
+        placeMapObject(apartmentBlue, 500, 1547, 32, 48, objectLayer);
+        placeMapObject(apartmentBlue, 600, 1547, 32, 48, objectLayer);
 
         // Create editor grid
         double gridSpacing = 4; // 8 world units after the 2x world scaling
@@ -1190,5 +1201,14 @@ public class Main extends Application {
         saveHitboxes();
 
         capturedCoordinateText.setText("Hitbox deleted!");
+    }
+
+    private void placeMapObject(Image image, double x, double y, double width, double height, Group targetLayer) {
+        MapObject mapObject = new MapObject(
+                image, x, y, width, height, 2
+        );
+
+        mapObjects.add(mapObject);
+        targetLayer.getChildren().add(mapObject.getImageView());
     }
 }
