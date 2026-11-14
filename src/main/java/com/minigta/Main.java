@@ -312,8 +312,9 @@ public class Main extends Application {
                     gridLayer.getChildren().add(routeLine);
                 }
 
-                // Save the waypoint
+                // Save the stuffs
                 currentRoute.add(waypoint);
+                saveTrafficRoutes();
 
                 // Create its visual marker
                 Circle marker = new Circle(
@@ -899,6 +900,8 @@ public class Main extends Application {
                         );
 
                         updateTrafficRouteAppearance();
+
+                        saveTrafficRoutes();
                     }
                 }
 
@@ -934,7 +937,6 @@ public class Main extends Application {
                 }
                 case DELETE -> {
                     if (editorMode) {
-
                         if (trafficEditorMode) {
 
                             // Get the currently selected route and its visual lists
@@ -973,6 +975,8 @@ public class Main extends Application {
                                         "Route " + (selectedTrafficRoute + 1)
                                                 + ": waypoint removed"
                                 );
+
+                                saveTrafficRoutes();
 
                                 capturedCoordinateText.setVisible(true);
                             }
@@ -1462,8 +1466,10 @@ public class Main extends Application {
 
         world.getTransforms().add(new Scale(2, 2, 0, 0));
         foregroundWorld.getTransforms().add(new Scale(2, 2, 0, 0));
+
         loadHitboxes(gridLayer);
         loadOcclusionZones(gridLayer);
+        loadTrafficRoutes(gridLayer);
 
         stage.setScene(scene);
         stage.setTitle("Mini GTA");
@@ -1878,6 +1884,173 @@ public class Main extends Application {
             e.printStackTrace();
         }
     }
+
+    private void saveTrafficRoutes() {
+
+        List<String> lines = new ArrayList<>();
+
+        // Save the total number of routes
+        lines.add(String.valueOf(trafficRoutes.size()));
+
+        // Save each route on a separate line
+        for (List<Point2D> route : trafficRoutes) {
+
+            // Represent an empty route with "-"
+            if (route.isEmpty()) {
+                lines.add("-");
+                continue;
+            }
+
+            String routeData = "";
+
+            // Save every waypoint's coordinates
+            for (int i = 0; i < route.size(); i++) {
+
+                Point2D waypoint = route.get(i);
+
+                if (i > 0) {
+                    routeData += ";";
+                }
+
+                routeData += waypoint.getX() + "," + waypoint.getY();
+            }
+
+            lines.add(routeData);
+        }
+
+        Path file = Path.of(
+                System.getProperty("user.dir"),
+                "traffic_routes.txt"
+        );
+
+        try {
+            Files.write(file, lines);
+
+            System.out.println(
+                    "Traffic routes saved: " + trafficRoutes.size()
+            );
+
+        } catch (IOException e) {
+            System.out.println("Could not save traffic routes.");
+            e.printStackTrace();
+        }
+    }
+
+
+    private void loadTrafficRoutes(Group gridLayer) {
+
+        Path file = Path.of(
+                System.getProperty("user.dir"),
+                "traffic_routes.txt"
+        );
+
+        if (!Files.exists(file)) {
+            return;
+        }
+
+        try {
+            List<String> lines = Files.readAllLines(file);
+
+            if (lines.isEmpty()) {
+                return;
+            }
+
+            int routeCount = Integer.parseInt(lines.get(0));
+
+            // Check whether the file contains enough route data
+            if (routeCount < 1 || lines.size() < routeCount + 1) {
+                System.out.println("Invalid traffic route file.");
+                return;
+            }
+
+            // Clear the initial empty route
+            trafficRoutes.clear();
+            trafficRouteWaypointVisuals.clear();
+            trafficRouteLineVisuals.clear();
+
+            // Reconstruct every route
+            for (int i = 0; i < routeCount; i++) {
+
+                List<Point2D> route = new ArrayList<>();
+                List<Circle> markers = new ArrayList<>();
+                List<Line> routeLines = new ArrayList<>();
+
+                Color routeColor = trafficRouteColors[i % trafficRouteColors.length];
+
+                String routeData = lines.get(i + 1);
+
+                // Skip empty routes
+                if (!routeData.equals("-")) {
+
+                    String[] waypoints = routeData.split(";");
+
+                    for (String waypointData : waypoints) {
+
+                        String[] coordinates = waypointData.split(",");
+
+                        if (coordinates.length != 2) {
+                            continue;
+                        }
+
+                        double x = Double.parseDouble(coordinates[0]);
+                        double y = Double.parseDouble(coordinates[1]);
+
+                        Point2D waypoint = new Point2D(x, y);
+
+                        // Recreate the connecting line
+                        if (!route.isEmpty()) {
+
+                            Point2D previous =
+                                    route.get(route.size() - 1);
+
+                            Line routeLine = new Line(
+                                    previous.getX() / 2,
+                                    previous.getY() / 2,
+                                    waypoint.getX() / 2,
+                                    waypoint.getY() / 2
+                            );
+
+                            routeLine.setStroke(routeColor);
+                            routeLine.setStrokeWidth(1.5);
+
+                            routeLines.add(routeLine);
+                            gridLayer.getChildren().add(routeLine);
+                        }
+
+                        route.add(waypoint);
+
+                        // Recreate the waypoint marker
+                        Circle marker = new Circle(
+                                waypoint.getX() / 2,
+                                waypoint.getY() / 2,
+                                3
+                        );
+
+                        marker.setFill(routeColor);
+                        marker.setStroke(Color.WHITE);
+                        marker.setStrokeWidth(0.8);
+
+                        markers.add(marker);
+                        gridLayer.getChildren().add(marker);
+                    }
+                }
+
+                trafficRoutes.add(route);
+                trafficRouteWaypointVisuals.add(markers);
+                trafficRouteLineVisuals.add(routeLines);
+            }
+
+            selectedTrafficRoute = 0;
+            updateTrafficRouteAppearance();
+
+            System.out.println("Traffic routes loaded: " + trafficRoutes.size());
+
+        } catch (IOException | NumberFormatException e) {
+            System.out.println("Could not load traffic routes.");
+            e.printStackTrace();
+        }
+    }
+
 
     private void loadOcclusionZones(Group gridLayer) {
 
