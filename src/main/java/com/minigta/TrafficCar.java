@@ -1,39 +1,25 @@
+
 package com.minigta;
 
-public class TrafficCar extends Interactable {
+public class TrafficCar extends Car {
 
-    private double speed;
-    private String direction;
-    private String vehicleType;
+    // Index of the waypoint this car is currently targeting
+    private int targetIndex;
 
-    public TrafficCar(double worldX, double worldY, double speed, String direction, String vehicleType) {
+    public TrafficCar(double worldX, double worldY,
+                      double speed, String direction,
+                      String vehicleType) {
 
-        super(worldX, worldY, "trafficCar");
+        super(worldX, worldY, speed, direction, vehicleType);
 
-        this.speed = speed;
-        this.direction = direction;
-        this.vehicleType = vehicleType;
+        this.targetIndex = 0;
     }
 
-    public void move(double deltaTime) {
-
-        if (direction.equals("right")) {
-            setWorldX(getWorldX() + speed * deltaTime);
-
-        } else if (direction.equals("left")) {
-            setWorldX(getWorldX() - speed * deltaTime);
-        }
+    public int getTargetIndex() {
+        return targetIndex;
     }
 
-    public double getSpeed() {
-        return speed;
-    }
-
-    public String getDirection() {
-        return direction;
-    }
-
-    public String getVehicleType() {
-        return vehicleType;
+    public void setTargetIndex(int targetIndex) {
+        this.targetIndex = targetIndex;
     }
 }

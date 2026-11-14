@@ -12,16 +12,17 @@ import javafx.stage.Stage;
 import javafx.scene.image.Image;
 import javafx.scene.image.ImageView;
 import javafx.scene.shape.Rectangle;
+import javafx.scene.shape.Circle;
 import javafx.scene.Group;
 import javafx.scene.paint.Color;
 import javafx.scene.shape.Line;
 import javafx.geometry.Point2D;
+
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.ArrayList;
-
 import java.lang.Math;
 
 public class Main extends Application {
@@ -45,6 +46,10 @@ public class Main extends Application {
 
     private boolean editorMode = false;
     private boolean f1Down = false;
+    private boolean oDown = false;
+
+    private boolean nDown = false;
+    private boolean tabDown = false;
 
     private boolean hasDragged = false;
 
@@ -57,10 +62,10 @@ public class Main extends Application {
     private long lastTime = 0;
     private double deltaTime;
 
-    private Rectangle[] buildingHitbox = new Rectangle[50];
+    private Rectangle[] buildingHitbox = new Rectangle[2000];
     private int buildingCount = 0;
 
-    private Rectangle[] buildingHitboxVisual = new Rectangle[50];
+    private Rectangle[] buildingHitboxVisual = new Rectangle[2000];
     private int selectedHitboxIndex = -1;
 
     private Rectangle hoverTile;
@@ -91,6 +96,13 @@ public class Main extends Application {
     private Player playerObject;
 
     private final List<MapObject> mapObjects = new ArrayList<>();
+
+    // Occlusion zones
+    private final List<Rectangle> occlusionZones = new ArrayList<>();
+    private final List<Rectangle> occlusionZoneVisuals = new ArrayList<>();
+
+    private boolean occlusionEditorMode = false;
+    private int selectedOcclusionZoneIndex = -1;
 
     private static double cameraX = 0;
     private static double cameraY = 0;
@@ -140,9 +152,41 @@ public class Main extends Application {
 
     private Rectangle hitboxPreview;
 
+    // Traffic route editor
+    private boolean trafficEditorMode = false;
+
+    private final List<Point2D> trafficWaypoints = new ArrayList<>();
+    private final List<Circle> trafficWaypointVisuals = new ArrayList<>();
+    private final List<Line> trafficRouteLines = new ArrayList<>();
+
+    // Multiple traffic routes
+    private final List<List<Point2D>> trafficRoutes = new ArrayList<>();
+
+    private final List<List<Circle>> trafficRouteWaypointVisuals = new ArrayList<>();
+
+    private final List<List<Line>> trafficRouteLineVisuals = new ArrayList<>();
+
+    // Colors assigned to traffic routes
+    private final Color[] trafficRouteColors = {Color.LIMEGREEN, Color.DODGERBLUE, Color.ORANGE, Color.MAGENTA, Color.YELLOW};
+
+    // Index of the currently selected route
+    private int selectedTrafficRoute = 0;
+
+    // Traffic AI
+    private final List<TrafficCar> trafficCars = new ArrayList<>();
+    private final List<TrafficController> trafficControllers = new ArrayList<>();
+    private final List<ImageView> trafficCarViews = new ArrayList<>();
+
+    private Image trafficCarImage;
+
     @Override
     public void start(Stage stage) {
         Pane root = new Pane();
+
+        // Create the first traffic route
+        trafficRoutes.add(new ArrayList<>());
+        trafficRouteWaypointVisuals.add(new ArrayList<>());
+        trafficRouteLineVisuals.add(new ArrayList<>());
 
         Group world = new Group();
         Group foregroundWorld = new Group();
@@ -204,7 +248,11 @@ public class Main extends Application {
         });
 
         root.setOnMouseClicked(event -> {
-            if (!editorMode || event.getButton() != MouseButton.PRIMARY) {
+            if (!editorMode) {
+                return;
+            }
+
+            if (event.getButton() != MouseButton.PRIMARY) {
                 return;
             }
 
@@ -218,8 +266,164 @@ public class Main extends Application {
                     event.getSceneY()
             );
 
+            // Traffic waypoint placement
+            if (trafficEditorMode) {
+
+                // Get the currently selected route and its visual lists
+                List<Point2D> currentRoute = trafficRoutes.get(selectedTrafficRoute);
+
+                List<Circle> currentMarkers = trafficRouteWaypointVisuals.get(selectedTrafficRoute);
+
+                List<Line> currentLines = trafficRouteLineVisuals.get(selectedTrafficRoute);
+
+                // Get the color assigned to this route
+                Color routeColor = trafficRouteColors[selectedTrafficRoute % trafficRouteColors.length];
+
+                double gridSpacing = 4;
+
+                double snappedX =
+                        Math.floor(mouseMap.getX() / gridSpacing) * gridSpacing;
+
+                double snappedY =
+                        Math.floor(mouseMap.getY() / gridSpacing) * gridSpacing;
+
+                Point2D waypoint = new Point2D(
+                        snappedX * 2 + gridSpacing,
+                        snappedY * 2 + gridSpacing
+                );
+
+                // Connect this waypoint to the previous one
+                if (!currentRoute.isEmpty()) {
+
+                    Point2D previous =
+                            currentRoute.get(currentRoute.size() - 1);
+
+                    Line routeLine = new Line(
+                            previous.getX() / 2,
+                            previous.getY() / 2,
+                            waypoint.getX() / 2,
+                            waypoint.getY() / 2
+                    );
+
+                    routeLine.setStroke(routeColor);
+                    routeLine.setStrokeWidth(1.5);
+
+                    currentLines.add(routeLine);
+                    gridLayer.getChildren().add(routeLine);
+                }
+
+                // Save the waypoint
+                currentRoute.add(waypoint);
+
+                // Create its visual marker
+                Circle marker = new Circle(
+                        snappedX + gridSpacing / 2,
+                        snappedY + gridSpacing / 2,
+                        3
+                );
+
+                marker.setFill(routeColor);
+                marker.setStroke(Color.WHITE);
+                marker.setStrokeWidth(0.8);
+
+                currentMarkers.add(marker);
+                gridLayer.getChildren().add(marker);
+
+                capturedCoordinateText.setText(
+                        "Route " + (selectedTrafficRoute + 1)
+                                + ": waypoint #" + currentRoute.size()
+                );
+
+                capturedCoordinateText.setVisible(true);
+                return;
+            }
+
+            if (hasDragged) {
+                hasDragged = false;
+                return;
+            }
+
             double mouseWorldX = mouseMap.getX() * 2;
             double mouseWorldY = mouseMap.getY() * 2;
+
+            // Handle occlusion-zone editing
+            if (occlusionEditorMode) {
+
+                selectedOcclusionZoneIndex = -1;
+
+                // Check whether the click selects an existing occlusion zone
+                for (int i = 0; i < occlusionZoneVisuals.size(); i++) {
+
+                    if (occlusionZoneVisuals.get(i).contains(
+                            mouseMap.getX(), mouseMap.getY())) {
+
+                        selectedOcclusionZoneIndex = i;
+                        break;
+                    }
+                }
+
+                // Highlight the selected zone
+                for (int i = 0; i < occlusionZoneVisuals.size(); i++) {
+
+                    if (i == selectedOcclusionZoneIndex) {
+                        occlusionZoneVisuals.get(i).setStroke(Color.YELLOW);
+                        occlusionZoneVisuals.get(i).setStrokeWidth(2);
+                    } else {
+                        occlusionZoneVisuals.get(i).setStroke(Color.DEEPSKYBLUE);
+                        occlusionZoneVisuals.get(i).setStrokeWidth(1);
+                    }
+                }
+
+                if (selectedOcclusionZoneIndex != -1) {
+
+                    capturedCoordinateText.setText(
+                            "Selected occlusion zone #" +
+                                    (selectedOcclusionZoneIndex + 1) +
+                                    " | Press DELETE to remove"
+                    );
+
+                    capturedCoordinateText.setVisible(true);
+                    return;
+                }
+
+                // Create a small zone when the user performs a normal click
+                double gridSpacing = 4;
+
+                double snappedX = Math.floor(mouseMap.getX() / gridSpacing) * gridSpacing;
+                double snappedY = Math.floor(mouseMap.getY() / gridSpacing) * gridSpacing;
+
+                Rectangle visual = new Rectangle(
+                        snappedX,
+                        snappedY,
+                        gridSpacing,
+                        gridSpacing
+                );
+
+                visual.setFill(Color.rgb(0, 180, 255, 0.25));
+                visual.setStroke(Color.DEEPSKYBLUE);
+                visual.setStrokeWidth(1);
+
+                Rectangle zone = new Rectangle(
+                        snappedX * 2,
+                        snappedY * 2,
+                        gridSpacing * 2,
+                        gridSpacing * 2
+                );
+
+                gridLayer.getChildren().add(visual);
+
+                occlusionZoneVisuals.add(visual);
+                occlusionZones.add(zone);
+
+                saveOcclusionZones();
+
+                capturedCoordinateText.setText(
+                        "Created occlusion zone #" + occlusionZones.size()
+                );
+
+                capturedCoordinateText.setVisible(true);
+                return;
+            }
 
             // Check whether the click hits an existing hitbox
             selectedHitboxIndex = -1;
@@ -302,6 +506,12 @@ public class Main extends Application {
                 return;
             }
 
+            if (trafficEditorMode) {
+                drawingHitbox = false;
+                hitboxPreview.setVisible(false);
+                return;
+            }
+
             Point2D mouseWorld = world.sceneToLocal(
                     event.getSceneX(),
                     event.getSceneY()
@@ -316,6 +526,16 @@ public class Main extends Application {
             hitboxPreview.setY(hitboxStartY);
             hitboxPreview.setWidth(0);
             hitboxPreview.setHeight(0);
+
+            // Change preview color depending on editor mode
+            if (occlusionEditorMode) {
+                hitboxPreview.setFill(Color.rgb(0, 180, 255, 0.25));
+                hitboxPreview.setStroke(Color.DEEPSKYBLUE);
+            } else {
+                hitboxPreview.setFill(Color.rgb(255, 0, 0, 0.25));
+                hitboxPreview.setStroke(Color.RED);
+            }
+
             hitboxPreview.setVisible(true);
         });
 
@@ -355,6 +575,52 @@ public class Main extends Application {
 
             // Ignore a normal click or an extremely small drag
             if (hitboxPreview.getWidth() < 4 || hitboxPreview.getHeight() < 4) {
+
+                hitboxPreview.setVisible(false);
+                return;
+            }
+
+            // Create an occlusion zone instead of a building hitbox
+            if (occlusionEditorMode) {
+
+                if (occlusionZones.size() >= 2000) {
+                    capturedCoordinateText.setText("Occlusion zone limit reached!");
+                    capturedCoordinateText.setVisible(true);
+                    hitboxPreview.setVisible(false);
+                    return;
+                }
+
+                Rectangle savedZoneVisual = new Rectangle(
+                        hitboxPreview.getX(),
+                        hitboxPreview.getY(),
+                        hitboxPreview.getWidth(),
+                        hitboxPreview.getHeight()
+                );
+
+                savedZoneVisual.setFill(Color.rgb(0, 180, 255, 0.25));
+                savedZoneVisual.setStroke(Color.DEEPSKYBLUE);
+                savedZoneVisual.setStrokeWidth(1);
+
+                // Convert map coordinates into world coordinates
+                Rectangle savedZone = new Rectangle(
+                        savedZoneVisual.getX() * 2,
+                        savedZoneVisual.getY() * 2,
+                        savedZoneVisual.getWidth() * 2,
+                        savedZoneVisual.getHeight() * 2
+                );
+
+                gridLayer.getChildren().add(savedZoneVisual);
+
+                occlusionZoneVisuals.add(savedZoneVisual);
+                occlusionZones.add(savedZone);
+
+                saveOcclusionZones();
+
+                capturedCoordinateText.setText(
+                        "Created occlusion zone #" + occlusionZones.size()
+                );
+
+                capturedCoordinateText.setVisible(true);
 
                 hitboxPreview.setVisible(false);
                 return;
@@ -417,18 +683,6 @@ public class Main extends Application {
                 getClass().getResource(
                         "/map/objects/buildings/apartment_blue.png"
                 ).toExternalForm()
-        );
-
-        placeMapObject(
-                apartmentBlue, 500, 1547, 32, 48,
-                foregroundWorld,
-                2, 26, 28, 20
-        );
-
-        placeMapObject(
-                apartmentBlue, 600, 1547, 32, 48,
-                foregroundWorld,
-                2, 26, 28, 20
         );
 
         // Create editor grid
@@ -532,7 +786,13 @@ public class Main extends Application {
                         f1Down = true;
 
                         if (editorMode) {
-                            modeText.setText("EDITOR MODE");
+                            if (trafficEditorMode) {
+                                modeText.setText("EDITOR MODE - TRAFFIC WAYPOINTS");
+                            } else if (occlusionEditorMode) {
+                                modeText.setText("EDITOR MODE - OCCLUSION ZONES");
+                            } else {
+                                modeText.setText("EDITOR MODE - BUILDING HITBOXES");
+                            }
                             modeText.setVisible(true);
                         } else {
                             modeText.setText("PLAY MODE");
@@ -540,9 +800,185 @@ public class Main extends Application {
                         }
                     }
                 }
+                case O -> {
+                    if (editorMode && !oDown) {
+                        oDown = true;
+
+                        // Cycle: Building -> Occlusion -> Traffic -> Building
+                        if (!occlusionEditorMode && !trafficEditorMode) {
+                            occlusionEditorMode = true;
+                        } else if (occlusionEditorMode) {
+                            occlusionEditorMode = false;
+                            trafficEditorMode = true;
+                        } else {
+                            trafficEditorMode = false;
+                        }
+
+                        selectedHitboxIndex = -1;
+                        selectedOcclusionZoneIndex = -1;
+
+                        // Restore the normal appearance of existing editor objects
+                        for (int i = 0; i < buildingCount; i++) {
+                            buildingHitboxVisual[i].setStroke(Color.RED);
+                            buildingHitboxVisual[i].setStrokeWidth(1);
+                        }
+
+                        for (Rectangle visual : occlusionZoneVisuals) {
+                            visual.setStroke(Color.DEEPSKYBLUE);
+                            visual.setStrokeWidth(1);
+                        }
+
+                        // Update the hover tile and mode label
+                        if (trafficEditorMode) {
+                            hoverTile.setFill(Color.rgb(0, 255, 100, 0.35));
+                            hoverTile.setStroke(Color.LIMEGREEN);
+
+                            modeText.setText("EDITOR MODE - TRAFFIC WAYPOINTS");
+                            capturedCoordinateText.setText(
+                                    "Traffic editing: GREEN markers | Left-click to add"
+                            );
+
+                        } else if (occlusionEditorMode) {
+                            hoverTile.setFill(Color.rgb(0, 180, 255, 0.35));
+                            hoverTile.setStroke(Color.DEEPSKYBLUE);
+
+                            modeText.setText("EDITOR MODE - OCCLUSION ZONES");
+                            capturedCoordinateText.setText(
+                                    "Occlusion editing: BLUE rectangles"
+                            );
+
+                        } else {
+                            hoverTile.setFill(Color.rgb(255, 0, 0, 0.35));
+                            hoverTile.setStroke(Color.RED);
+
+                            modeText.setText("EDITOR MODE - BUILDING HITBOXES");
+                            capturedCoordinateText.setText(
+                                    "Building hitbox editing: RED rectangles"
+                            );
+                        }
+
+                        capturedCoordinateText.setVisible(true);
+                    }
+                }
+                case T -> {
+                    System.out.println("T KEY DETECTED!");
+                    System.out.println("Editor mode: " + editorMode);
+                    System.out.println(
+                            "Selected route waypoints: " +
+                                    trafficRoutes.get(selectedTrafficRoute).size()
+                    );
+
+                    if (!editorMode) {
+                        System.out.println("Calling spawnTrafficCar...");
+                        spawnTrafficCar(root);
+                    } else {
+                        System.out.println("Cannot spawn: currently in editor mode.");
+                    }
+                }
+                case N -> {
+                    if (editorMode && trafficEditorMode && !nDown) {
+                        nDown = true;
+
+                        // Create a new route with its own three lists
+                        trafficRoutes.add(new ArrayList<>());
+                        trafficRouteWaypointVisuals.add(new ArrayList<>());
+                        trafficRouteLineVisuals.add(new ArrayList<>());
+
+                        // Select the newly created route
+                        selectedTrafficRoute = trafficRoutes.size() - 1;
+
+                        capturedCoordinateText.setText(
+                                "Created Route " + (selectedTrafficRoute + 1)
+                                        + " | Left-click to add waypoints"
+                        );
+
+                        capturedCoordinateText.setVisible(true);
+
+                        System.out.println(
+                                "Created traffic route: " + (selectedTrafficRoute + 1)
+                        );
+
+                        updateTrafficRouteAppearance();
+                    }
+                }
+
+                case TAB -> {
+                    if (editorMode && trafficEditorMode && !tabDown) {
+                        tabDown = true;
+
+                        // Move to the next route
+                        selectedTrafficRoute++;
+
+                        // Return to Route 1 after the final route
+                        if (selectedTrafficRoute >= trafficRoutes.size()) {
+                            selectedTrafficRoute = 0;
+                        }
+
+                        List<Point2D> currentRoute =
+                                trafficRoutes.get(selectedTrafficRoute);
+
+                        capturedCoordinateText.setText(
+                                "Selected Route " + (selectedTrafficRoute + 1)
+                                        + " | Waypoints: " + currentRoute.size()
+                        );
+
+                        capturedCoordinateText.setVisible(true);
+
+                        System.out.println(
+                                "Switched to traffic route: " + (selectedTrafficRoute + 1)
+                        );
+
+                        event.consume();
+                        updateTrafficRouteAppearance();
+                    }
+                }
                 case DELETE -> {
                     if (editorMode) {
-                        deleteSelectedHitbox(gridLayer);
+
+                        if (trafficEditorMode) {
+
+                            // Get the currently selected route and its visual lists
+                            List<Point2D> currentRoute =
+                                    trafficRoutes.get(selectedTrafficRoute);
+
+                            List<Circle> currentMarkers =
+                                    trafficRouteWaypointVisuals.get(selectedTrafficRoute);
+
+                            List<Line> currentLines =
+                                    trafficRouteLineVisuals.get(selectedTrafficRoute);
+
+                            // Only delete if the route contains waypoints
+                            if (!currentRoute.isEmpty()) {
+
+                                // Remove the last waypoint
+                                currentRoute.remove(currentRoute.size() - 1);
+
+                                // Remove its visual marker
+                                if (!currentMarkers.isEmpty()) {
+                                    Circle lastMarker =
+                                            currentMarkers.remove(currentMarkers.size() - 1);
+
+                                    gridLayer.getChildren().remove(lastMarker);
+                                }
+
+                                // Remove the connecting line
+                                if (!currentLines.isEmpty()) {
+                                    Line lastLine =
+                                            currentLines.remove(currentLines.size() - 1);
+
+                                    gridLayer.getChildren().remove(lastLine);
+                                }
+
+                                capturedCoordinateText.setText(
+                                        "Route " + (selectedTrafficRoute + 1)
+                                                + ": waypoint removed"
+                                );
+
+                                capturedCoordinateText.setVisible(true);
+                            }
+
+                            return;
+                        }
                     }
                 }
             }
@@ -567,6 +1003,9 @@ public class Main extends Application {
                     else dDown = false;
                 }
                 case F -> fPressed = false;
+                case O -> oDown = false;
+                case N -> nDown = false;
+                case TAB -> tabDown = false;
                 case SPACE -> handbrakeDown = false;
                 case F1 -> f1Down = false;
             }
@@ -671,6 +1110,13 @@ public class Main extends Application {
                     }
                 }
 
+                // Hide the player when inside a building's occlusion zone
+                if (!isDriving) {
+                    player.setVisible(
+                            editorMode || !isPlayerInsideOcclusionZone()
+                    );
+                }
+
                 if (!editorMode && isDriving) {
                     Car car = cars[currentCar];
                     car.setHandbrakeActive(handbrakeDown);
@@ -720,14 +1166,35 @@ public class Main extends Application {
                 world.setTranslateX(-cameraX);
                 world.setTranslateY(-cameraY);
 
+                // Update traffic AI
+                if (!editorMode) {
+                    for (int i = 0; i < trafficControllers.size(); i++) {
+                        trafficControllers.get(i).update(deltaTime);
+                    }
+                }
+
                 foregroundWorld.setTranslateX(-cameraX);
                 foregroundWorld.setTranslateY(-cameraY);
+
+                // Update traffic car screen positions
+                for (int i = 0; i < trafficCars.size(); i++) {
+
+                    TrafficCar trafficCar = trafficCars.get(i);
+                    ImageView trafficView = trafficCarViews.get(i);
+
+                    trafficView.setX(trafficCar.getWorldX() - cameraX);
+                    trafficView.setY(trafficCar.getWorldY() - cameraY);
+
+                    trafficView.setRotate(trafficCar.getAngle());
+                }
 
                 player.setX(playerObject.getWorldX() + 8 - cameraX);
                 player.setY(playerObject.getWorldY() + 12 - cameraY);
 
                 carViews[0].setX(cars[0].getWorldX() - cameraX);
                 carViews[0].setY(cars[0].getWorldY() - cameraY);
+
+                carViews[0].setVisible(editorMode || !isCarInsideOcclusionZone(cars[0]));
 
                 Car car = cars[0];
 
@@ -941,6 +1408,8 @@ public class Main extends Application {
             );
         }
 
+        trafficCarImage = taxiImage;
+
         carViews[0] = new ImageView(taxiImage);
         carViews[0].setSmooth(false);
 
@@ -994,6 +1463,7 @@ public class Main extends Application {
         world.getTransforms().add(new Scale(2, 2, 0, 0));
         foregroundWorld.getTransforms().add(new Scale(2, 2, 0, 0));
         loadHitboxes(gridLayer);
+        loadOcclusionZones(gridLayer);
 
         stage.setScene(scene);
         stage.setTitle("Mini GTA");
@@ -1013,6 +1483,82 @@ public class Main extends Application {
         name.setScaleX(ratio);
         name.setScaleY(ratio);
     }
+
+    private void spawnTrafficCar(Pane root) {
+
+        // Get the currently selected route
+        List<Point2D> currentRoute =
+                trafficRoutes.get(selectedTrafficRoute);
+
+        System.out.println("=== SPAWN TRAFFIC CAR ===");
+        System.out.println("Existing traffic cars: " + trafficCars.size());
+        System.out.println("Selected route: " + (selectedTrafficRoute + 1));
+        System.out.println("Waypoint count: " + currentRoute.size());
+
+        // Require at least three waypoints
+        if (currentRoute.size() < 3) {
+            capturedCoordinateText.setText(
+                    "Place at least 3 waypoints on this route first!"
+            );
+            capturedCoordinateText.setVisible(true);
+            return;
+        }
+
+        // Only allow one traffic car during our first test
+        if (!trafficCars.isEmpty()) {
+            capturedCoordinateText.setText(
+                    "A traffic car already exists!"
+            );
+            capturedCoordinateText.setVisible(true);
+            return;
+        }
+
+        // Copy the selected route
+        List<Point2D> route = new ArrayList<>(currentRoute);
+
+        // Get the first waypoint
+        Point2D start = route.get(0);
+
+        // Position the car so its center aligns with the waypoint
+        TrafficCar trafficCar = new TrafficCar(
+                start.getX() - 23.0 / 2,
+                start.getY() - 40.0 / 2,
+                0,
+                "right",
+                "traffic"
+        );
+
+        // Create the AI controller
+        TrafficController controller =
+                new TrafficController(trafficCar, route);
+
+        // Create the visual representation
+        ImageView trafficView = new ImageView(trafficCarImage);
+        trafficView.setSmooth(false);
+
+        scale(trafficView, 1.8);
+
+        trafficView.setX(trafficCar.getWorldX());
+        trafficView.setY(trafficCar.getWorldY());
+        trafficView.setRotate(trafficCar.getAngle());
+
+        // Add the vehicle behind the player
+        root.getChildren().add(
+                root.getChildren().indexOf(player),
+                trafficView
+        );
+
+        // Store the objects
+        trafficCars.add(trafficCar);
+        trafficControllers.add(controller);
+        trafficCarViews.add(trafficView);
+
+        capturedCoordinateText.setText("Traffic car spawned!");
+        capturedCoordinateText.setVisible(true);
+
+        System.out.println("TRAFFIC CAR SUCCESSFULLY CREATED!");
+    }
+
 
     public boolean checkCollision(Rectangle player, Rectangle building) {
         double playerLeft = player.getX();
@@ -1251,5 +1797,188 @@ public class Main extends Application {
 
         mapObjects.add(mapObject);
         targetLayer.getChildren().add(mapObject.getImageView());
+    }
+
+    private boolean isPlayerInsideOcclusionZone() {
+
+        for (Rectangle zone : occlusionZones) {
+
+            if (checkCollision(playerHitbox, zone)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private boolean isCarInsideOcclusionZone(Car car) {
+
+        // Car hitbox dimensions
+        double halfWidth = 17 * 1.8 / 2;
+        double halfHeight = 32 * 1.8 / 2;
+
+        // Car center in world coordinates
+        double centerX = car.getWorldX() + 23.0 / 2;
+        double centerY = car.getWorldY() + 40.0 / 2;
+
+        double radians = Math.toRadians(car.getAngle());
+
+        double cos = Math.abs(Math.cos(radians));
+        double sin = Math.abs(Math.sin(radians));
+
+        // Calculate the bounding box of the rotated car
+        double extentX = cos * halfWidth + sin * halfHeight;
+        double extentY = sin * halfWidth + cos * halfHeight;
+
+        Rectangle carHitbox = new Rectangle(
+                centerX - extentX,
+                centerY - extentY,
+                extentX * 2,
+                extentY * 2
+        );
+
+        for (Rectangle zone : occlusionZones) {
+
+            if (checkCollision(carHitbox, zone)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private void saveOcclusionZones() {
+
+        List<String> lines = new ArrayList<>();
+
+        for (Rectangle zone : occlusionZones) {
+
+            lines.add(
+                    zone.getX() + "," +
+                            zone.getY() + "," +
+                            zone.getWidth() + "," +
+                            zone.getHeight()
+            );
+        }
+
+        Path file = Path.of(
+                System.getProperty("user.dir"),
+                "occlusion_zones.txt"
+        );
+
+        try {
+            Files.write(file, lines);
+
+            System.out.println(
+                    "Occlusion zones saved: " + occlusionZones.size()
+            );
+
+        } catch (IOException e) {
+            System.out.println("Could not save occlusion zones.");
+            e.printStackTrace();
+        }
+    }
+
+    private void loadOcclusionZones(Group gridLayer) {
+
+        Path file = Path.of(
+                System.getProperty("user.dir"),
+                "occlusion_zones.txt"
+        );
+
+        if (!Files.exists(file)) {
+            return;
+        }
+
+        try {
+
+            List<String> lines = Files.readAllLines(file);
+
+            for (String line : lines) {
+
+                String[] values = line.split(",");
+
+                if (values.length != 4 || occlusionZones.size() >= 2000) {
+                    continue;
+                }
+
+                double x = Double.parseDouble(values[0]);
+                double y = Double.parseDouble(values[1]);
+                double width = Double.parseDouble(values[2]);
+                double height = Double.parseDouble(values[3]);
+
+                // Restore the actual occlusion zone
+                Rectangle zone = new Rectangle(
+                        x, y, width, height
+                );
+
+                occlusionZones.add(zone);
+
+                // Restore its editor visualization
+                Rectangle visual = new Rectangle(
+                        x / 2,
+                        y / 2,
+                        width / 2,
+                        height / 2
+                );
+
+                visual.setFill(Color.rgb(0, 180, 255, 0.25));
+                visual.setStroke(Color.DEEPSKYBLUE);
+                visual.setStrokeWidth(1);
+
+                occlusionZoneVisuals.add(visual);
+                gridLayer.getChildren().add(visual);
+            }
+
+            System.out.println(
+                    "Occlusion zones loaded: " + occlusionZones.size()
+            );
+
+        } catch (IOException | NumberFormatException e) {
+            System.out.println("Could not load occlusion zones.");
+            e.printStackTrace();
+        }
+    }
+
+    private void deleteSelectedOcclusionZone(Group gridLayer) {
+
+        if (selectedOcclusionZoneIndex == -1) {
+            return;
+        }
+
+        int index = selectedOcclusionZoneIndex;
+
+        gridLayer.getChildren().remove(
+                occlusionZoneVisuals.get(index)
+        );
+
+        occlusionZoneVisuals.remove(index);
+        occlusionZones.remove(index);
+
+        selectedOcclusionZoneIndex = -1;
+
+        saveOcclusionZones();
+
+        capturedCoordinateText.setText("Occlusion zone deleted!");
+        capturedCoordinateText.setVisible(true);
+    }
+
+    private void updateTrafficRouteAppearance() {
+
+        for (int i = 0; i < trafficRouteWaypointVisuals.size(); i++) {
+
+            // Keep the selected route bright
+            double opacity = (i == selectedTrafficRoute) ? 1.0 : 0.25;
+
+            // Update waypoint markers
+            for (Circle marker : trafficRouteWaypointVisuals.get(i)) {
+                marker.setOpacity(opacity);
+            }
+
+            // Update route lines
+            for (Line line : trafficRouteLineVisuals.get(i)) {
+                line.setOpacity(opacity);
+            }
+        }
     }
 }
