@@ -123,8 +123,15 @@ public class Main extends Application {
     private Image[] playerLeftWalk = new Image[5];
     private Image[] playerRightWalk = new Image[5];
 
-    private ImageView[] npcs = new ImageView[3];
-    private NPC[] npcObjects = new NPC[3];
+    private ImageView[] npcs = new ImageView[50];
+    private NPC[] npcObjects = new NPC[50];
+
+    private Circle[] npcMarkers = new Circle[50];
+    private double[] npcMarkerTimers = new double[50];
+
+    // Driver NPCs
+    private final List<NPC> driverNPCs = new ArrayList<>();
+    private final List<ImageView> driverNPCViews = new ArrayList<>();
 
     private Car[] cars = new Car[1];
     private ImageView[] carViews = new ImageView[1];
@@ -171,13 +178,28 @@ public class Main extends Application {
 
     // Index of the currently selected route
     private int selectedTrafficRoute = 0;
+    private int nextTrafficRouteIndex = 0;
 
     // Traffic AI
     private final List<TrafficCar> trafficCars = new ArrayList<>();
     private final List<TrafficController> trafficControllers = new ArrayList<>();
     private final List<ImageView> trafficCarViews = new ArrayList<>();
 
-    private Image trafficCarImage;
+    private final List<TrafficCar> parkedCars = new ArrayList<>();
+    private final List<ImageView> parkedCarViews = new ArrayList<>();
+
+    // Traffic vehicle sprites
+    private Image redCarImage, blueCarImage, blueTruckImage, pinkCarImage, turquoiseCarImage, carBlueImage,
+                  carBlueDarkImage, carGrayImage, carGreenImage, carOrangeImage, carRedImage, carSportsRedImage,
+                  carTealImage, carWhiteImage, carYellowImage, constructionVehImage, vanImage, helicopterImage,
+                  fourXFourImage, breakdownTruckImage, bugImage, coachImage, cossieImage, counthashImage, italiImahe,
+                  jugularImage, mundanoImage, penetratorImage, pickUpImage, porkaTurboImage, repairVanImage, stallionImage,
+                  trainImage, tramImage;
+
+    private double trafficSpawnTimer = 0;
+
+    private static final double TRAFFIC_SPAWN_INTERVAL = 3.0;
+    private static final int MAX_TRAFFIC_CARS = 100;
 
     @Override
     public void start(Stage stage) {
@@ -871,7 +893,7 @@ public class Main extends Application {
 
                     if (!editorMode) {
                         System.out.println("Calling spawnTrafficCar...");
-                        spawnTrafficCar(root);
+                        spawnTrafficCar(root, false);
                     } else {
                         System.out.println("Cannot spawn: currently in editor mode.");
                     }
@@ -1027,6 +1049,21 @@ public class Main extends Application {
                 deltaTime = (now - lastTime) / 1_000_000_000.0;
                 lastTime = now;
 
+                // Automatically spawn traffic cars
+                if (!editorMode && getActiveTrafficCarCount() < MAX_TRAFFIC_CARS) {
+                    trafficSpawnTimer += deltaTime;
+
+                    if (trafficSpawnTimer >= TRAFFIC_SPAWN_INTERVAL) {
+                        int carsToSpawn = MAX_TRAFFIC_CARS - getActiveTrafficCarCount();
+
+                        for (int i = 0; i < carsToSpawn; i++) {
+                            spawnTrafficCar(root, true);
+                        }
+
+                        trafficSpawnTimer = 0;
+                    }
+                }
+
                 gridLayer.setVisible(editorMode);
 
                 if (!isDriving) {
@@ -1122,7 +1159,7 @@ public class Main extends Application {
                 }
 
                 if (!editorMode && isDriving) {
-                    Car car = cars[currentCar];
+                    Car car = getCurrentCar();
                     car.setHandbrakeActive(handbrakeDown);
 
                     boolean braking = drivingS && car.getSpeed() > 0;
@@ -1136,7 +1173,47 @@ public class Main extends Application {
 
                     if (drivingD) car.steerRight(deltaTime, braking);
 
+                    double previousX = car.getWorldX();
+                    double previousY = car.getWorldY();
+
                     car.move(deltaTime);
+
+// Check collisions with AI traffic cars
+                    for (TrafficCar trafficCar : trafficCars) {
+
+                        // Ignore the controlled car and parked vehicles
+                        if (trafficCar == car || trafficCar.isParked()
+                                || trafficCar.isPlayerControlled()) {
+                            continue;
+                        }
+
+                        Rectangle trafficHitbox = new Rectangle(
+                                trafficCar.getWorldX(),
+                                trafficCar.getWorldY(),
+                                23,
+                                40
+                        );
+
+                        if (car.intersects(trafficHitbox)) {
+
+                            double oldDX = previousX - trafficCar.getWorldX();
+                            double oldDY = previousY - trafficCar.getWorldY();
+
+                            double newDX = car.getWorldX() - trafficCar.getWorldX();
+                            double newDY = car.getWorldY() - trafficCar.getWorldY();
+
+                            double oldDistance = oldDX * oldDX + oldDY * oldDY;
+                            double newDistance = newDX * newDX + newDY * newDY;
+
+                            // Only block movement if it makes the overlap worse
+                            if (newDistance < oldDistance) {
+                                car.setWorldX(previousX);
+                                car.setWorldY(previousY);
+                            }
+
+                            break;
+                        }
+                    }
 
                     for (Rectangle building : buildingHitbox) {
                         if (building != null && car.resolveCollision(building)) {
@@ -1144,15 +1221,17 @@ public class Main extends Application {
                         }
                     }
 
-                    carViews[currentCar].setRotate(car.getAngle());
+                    getCurrentCarView().setRotate(car.getAngle());
                 }
 
                 double cameraTargetX;
                 double cameraTargetY;
 
                 if (isDriving) {
-                    cameraTargetX = cars[currentCar].getWorldX();
-                    cameraTargetY = cars[currentCar].getWorldY();
+                    Car car = getCurrentCar();
+
+                    cameraTargetX = car.getWorldX();
+                    cameraTargetY = car.getWorldY();
                 } else {
                     cameraTargetX = playerObject.getWorldX() + 24;
                     cameraTargetY = playerObject.getWorldY() + 24;
@@ -1177,6 +1256,10 @@ public class Main extends Application {
                     }
                 }
 
+                // Detect collisions between AI traffic and the walking player
+                handleTrafficPlayerCollisions(deltaTime);
+                handleTrafficCarCollisions(deltaTime);
+
                 foregroundWorld.setTranslateX(-cameraX);
                 foregroundWorld.setTranslateY(-cameraY);
 
@@ -1190,6 +1273,24 @@ public class Main extends Application {
                     trafficView.setY(trafficCar.getWorldY() - cameraY);
 
                     trafficView.setRotate(trafficCar.getAngle());
+
+                    trafficView.setVisible(
+                            editorMode || !trafficCar.isPlayerControlled()
+                                    || !isCarInsideOcclusionZone(trafficCar)
+                    );
+                }
+
+
+                // Update parked car screen positions
+                for (int i = 0; i < parkedCars.size(); i++) {
+                    TrafficCar parkedCar = parkedCars.get(i);
+                    ImageView parkedView = parkedCarViews.get(i);
+
+                    parkedView.setX(parkedCar.getWorldX() - cameraX);
+                    parkedView.setY(parkedCar.getWorldY() - cameraY);
+                    parkedView.setRotate(parkedCar.getAngle());
+
+                    parkedView.setVisible(editorMode || !isCarInsideOcclusionZone(parkedCar));
                 }
 
                 player.setX(playerObject.getWorldX() + 8 - cameraX);
@@ -1200,7 +1301,8 @@ public class Main extends Application {
 
                 carViews[0].setVisible(editorMode || !isCarInsideOcclusionZone(cars[0]));
 
-                Car car = cars[0];
+                Car car = isDriving ? getCurrentCar() : cars[0];
+
 
                 // Adjust the hitbox dimensions
                 double halfWidth = 17 * 1.8 / 2;
@@ -1234,27 +1336,113 @@ public class Main extends Application {
                 }
 
                 if (!editorMode) {
-                    double carDistanceX = playerObject.getWorldX() - cars[0].getWorldX();
-                    double carDistanceY = playerObject.getWorldY() - cars[0].getWorldY();
 
-                    double carDistance = Math.sqrt(Math.pow(carDistanceX, 2) + Math.pow(carDistanceY, 2));
+                    if (!isDriving) {
 
-                    if (!isDriving && carDistance < CAR_INTERACTION_DISTANCE) {
-                        interactionText.setText("Press F to enter taxi");
-                        interactionText.setVisible(true);
+                        Car nearestCar = null;
+                        int nearestCarIndex = -1;
+                        double nearestDistance = CAR_INTERACTION_DISTANCE;
 
-                        if (fPressed && !fWasPressed) {
-                            isDriving = true;
-                            currentCar = 0;
-                            handbrakeDown = false;
-                            player.setVisible(false);
+                        // Check the original taxi
+                        double dx = playerObject.getWorldX() -
+                                (cars[0].getWorldX() + 23.0 / 2);
+
+                        double dy = playerObject.getWorldY() -
+                                (cars[0].getWorldY() + 40.0 / 2);
+
+                        double distance = Math.sqrt(dx * dx + dy * dy);
+
+                        if (distance < nearestDistance) {
+                            nearestDistance = distance;
+                            nearestCar = cars[0];
+                            nearestCarIndex = 0;
                         }
-                    } else if (isDriving) {
+
+                        // Check every traffic car
+                        for (int i = 0; i < trafficCars.size(); i++) {
+
+                            TrafficCar trafficCar = trafficCars.get(i);
+
+                            dx = playerObject.getWorldX() -
+                                    (trafficCar.getWorldX() + 23.0 / 2);
+
+                            dy = playerObject.getWorldY() -
+                                    (trafficCar.getWorldY() + 40.0 / 2);
+
+                            distance = Math.sqrt(dx * dx + dy * dy);
+
+                            if (distance < nearestDistance) {
+                                nearestDistance = distance;
+                                nearestCar = trafficCar;
+                                nearestCarIndex = i + 1;
+                            }
+                        }
+
+                        // Check every parked car
+                        for (int i = 0; i < parkedCars.size(); i++) {
+
+                            TrafficCar parkedCar = parkedCars.get(i);
+
+                            dx = playerObject.getWorldX() - (parkedCar.getWorldX() + 23.0 / 2);
+
+                            dy = playerObject.getWorldY() - (parkedCar.getWorldY() + 40.0 / 2);
+
+                            distance = Math.sqrt(dx * dx + dy * dy);
+
+                            if (distance < nearestDistance) {
+                                nearestDistance = distance;
+                                nearestCar = parkedCar;
+                                nearestCarIndex = -(i + 1);
+                            }
+                        }
+
+                        // Show interaction when a vehicle is nearby
+                        if (nearestCar != null) {
+
+                            interactionText.setText("Press F to enter the vehicle");
+                            interactionText.setVisible(true);
+
+                            if (fPressed && !fWasPressed) {
+
+                                isDriving = true;
+                                currentCar = nearestCarIndex;
+
+                                // Entering an AI traffic car
+                                if (currentCar > 0) {
+
+                                    TrafficCar takenCar = trafficCars.get(currentCar - 1);
+
+                                    takenCar.setPlayerControlled(true);
+
+                                    if (!takenCar.isDriverSpawned()) {
+                                        spawnDriverNPC(takenCar, root);
+                                        takenCar.setDriverSpawned(true);
+                                    }
+                                }
+
+                                // Entering a parked car
+                                else if (currentCar < 0) {
+
+                                    TrafficCar takenCar = parkedCars.get(-currentCar - 1);
+
+                                    takenCar.setPlayerControlled(true);
+                                    takenCar.setParked(false);
+                                }
+
+                                handbrakeDown = false;
+                                player.setVisible(false);
+                            }
+
+                        } else {
+                            interactionText.setVisible(false);
+                        }
+
+                    } else {
+
                         interactionText.setText("Press F to exit the vehicle");
                         interactionText.setVisible(true);
 
                         if (fPressed && !fWasPressed) {
-//                        Car car = cars[currentCar];
 
                             double[] leftExit = car.getExitPosition(true);
                             double[] rightExit = car.getExitPosition(false);
@@ -1263,7 +1451,29 @@ public class Main extends Application {
                             boolean rightSafe = isSafeExit(rightExit[0], rightExit[1]);
 
                             if (leftSafe || rightSafe) {
-                                double[] exitPosition = leftSafe ? leftExit : rightExit;
+
+                                double[] exitPosition =
+                                        leftSafe ? leftExit : rightExit;
+
+                                // Permanently park the abandoned traffic car
+                                if (currentCar > 0) {
+
+                                    TrafficCar abandonedCar =
+                                            trafficCars.get(currentCar - 1);
+
+                                    abandonedCar.setPlayerControlled(false);
+                                    abandonedCar.setParked(true);
+                                }
+
+                                // Park the vehicle if it was originally a parked car
+                                else if (currentCar < 0) {
+
+                                    TrafficCar abandonedCar =
+                                            parkedCars.get(-currentCar - 1);
+
+                                    abandonedCar.setPlayerControlled(false);
+                                    abandonedCar.setParked(true);
+                                }
 
                                 playerObject.setWorldX(exitPosition[0]);
                                 playerObject.setWorldY(exitPosition[1]);
@@ -1285,8 +1495,14 @@ public class Main extends Application {
 
                                 player.setVisible(true);
 
-                                playerHitbox.setX(playerObject.getWorldX() + HITBOX_OFFSET_X);
-                                playerHitbox.setY(playerObject.getWorldY() + HITBOX_OFFSET_Y);
+                                playerHitbox.setX(
+                                        playerObject.getWorldX() + HITBOX_OFFSET_X
+                                );
+
+                                playerHitbox.setY(
+                                        playerObject.getWorldY() + HITBOX_OFFSET_Y
+                                );
+
                             } else {
                                 interactionText.setText("No safe place to exit!");
                             }
@@ -1300,31 +1516,112 @@ public class Main extends Application {
                 playerHitboxVisual.setY(playerObject.getWorldY() + HITBOX_OFFSET_Y - cameraY);
 
                 for (int i = 0; i < npcObjects.length; i++) {
+
+                    if (npcObjects[i] == null) {
+                        continue;
+                    }
+
                     if (!editorMode) {
                         if (i != 2) {
                             npcObjects[i].update(deltaTime);
                         }
 
-                        npcObjects[i].animate(deltaTime);
+                        if (!npcObjects[i].isKnockedDown()) {
+                            npcObjects[i].animate(deltaTime);
+                        }
+                    }
+
+                    if (npcObjects[i].isKnockedDown()) {
+
+                        npcMarkerTimers[i] += deltaTime;
+
+                        double progress = Math.min(npcMarkerTimers[i] / 1.5, 1.0);
+
+                        npcMarkers[i].setCenterX(
+                                npcObjects[i].getWorldX() + 16 - cameraX
+                        );
+
+                        npcMarkers[i].setCenterY(
+                                npcObjects[i].getWorldY() + 24 - cameraY
+                        );
+
+                        npcMarkers[i].setRadius(12 + 6 * progress);
+                        npcMarkers[i].setOpacity(0.65 * progress);
                     }
 
                     npcs[i].setX(npcObjects[i].getWorldX() - cameraX);
                     npcs[i].setY(npcObjects[i].getWorldY() - cameraY);
 
-                    if (npcObjects[i].getDirection().equals("right")) {
-                        npcs[i].setImage(npcRightWalk[npcObjects[i].getFrame()]);
-                    } else if (npcObjects[i].getDirection().equals("left")) {
-                        npcs[i].setImage(npcLeftWalk[npcObjects[i].getFrame()]);
-                    } else if (npcObjects[i].getDirection().equals("up")) {
-                        npcs[i].setImage(npcUpWalk[npcObjects[i].getFrame()]);
-                    } else if (npcObjects[i].getDirection().equals("down")) {
-                        npcs[i].setImage(npcDownWalk[npcObjects[i].getFrame()]);
+                    if (npcObjects[i].isKnockedDown()) {
+
+                        switch (npcObjects[i].getDirection()) {
+                            case "right":
+                                npcs[i].setImage(npcRightIdle);
+                                break;
+                            case "left":
+                                npcs[i].setImage(npcLeftIdle);
+                                break;
+                            case "up":
+                                npcs[i].setImage(npcUpIdle);
+                                break;
+                            case "down":
+                                npcs[i].setImage(npcDownIdle);
+                                break;
+                        }
+
+                    } else {
+
+                        if (npcObjects[i].getDirection().equals("right")) {
+                            npcs[i].setImage(npcRightWalk[npcObjects[i].getFrame()]);
+                        } else if (npcObjects[i].getDirection().equals("left")) {
+                            npcs[i].setImage(npcLeftWalk[npcObjects[i].getFrame()]);
+                        } else if (npcObjects[i].getDirection().equals("up")) {
+                            npcs[i].setImage(npcUpWalk[npcObjects[i].getFrame()]);
+                        } else if (npcObjects[i].getDirection().equals("down")) {
+                            npcs[i].setImage(npcDownWalk[npcObjects[i].getFrame()]);
+                        }
+                    }
+                }
+
+                // Update and render driver NPCs
+                for (int i = 0; i < driverNPCs.size(); i++) {
+
+                    NPC driver = driverNPCs.get(i);
+                    ImageView driverView = driverNPCViews.get(i);
+
+                    if (!editorMode) {
+                        driver.update(deltaTime);
+                        driver.animate(deltaTime);
+                    }
+
+                    driverView.setX(driver.getWorldX() - cameraX);
+                    driverView.setY(driver.getWorldY() - cameraY);
+
+                    if (!driver.isEscaping() || !driver.isMoving()) {
+
+                        // Standing still during the pause
+                        driverView.setImage(npcDownIdle);
+
+                    } else {
+
+                        // Walking away after the pause
+                        if (driver.getDirection().equals("right")) {
+                            driverView.setImage(npcRightWalk[driver.getFrame()]);
+                        } else if (driver.getDirection().equals("left")) {
+                            driverView.setImage(npcLeftWalk[driver.getFrame()]);
+                        } else if (driver.getDirection().equals("up")) {
+                            driverView.setImage(npcUpWalk[driver.getFrame()]);
+                        } else if (driver.getDirection().equals("down")) {
+                            driverView.setImage(npcDownWalk[driver.getFrame()]);
+                        }
                     }
                 }
 
                 if (!editorMode && npcObjects[1].getGroupId() == npcObjects[2].getGroupId()) {
                     npcObjects[2].follow(npcObjects[1], 32, 32);
                 }
+
+                handlePlayerCarNPCCollisions();
             }
         };
 
@@ -1334,15 +1631,46 @@ public class Main extends Application {
 
         playerObject = new Player(985, 3095, 200);
 
-        cars[0] = new Car(700, 2950, 0, "right", "taxi");
+        cars[0] = new Car(700, 2950, 0, "right", "redCar");
 
+        // Setup NPCs
+        // new NPC(worldX, worldY, speed, patrolStart, patrolEnd, movementType, groupId);
         npcObjects[0] = new NPC(560, 2730, 80, 26 * 16, 42 * 16, "horizontal", 1);
         npcObjects[1] = new NPC(850, 2730, 70, 30 * 16, 40 * 16, "vertical", 2);
         npcObjects[2] = new NPC(1100, 2820, 60, 40 * 16, 46 * 16, "vertical", 2);
 
-        Image taxiImage = new Image(
-                getClass().getResource("/legacy_tiles/vehicles/taxi/taxi_frame_01.png").toExternalForm()
-        );
+        redCarImage = new Image(getClass().getResource("/legacy_tiles/vehicles/red_car_frame_01.png").toExternalForm());
+        blueCarImage = new Image(getClass().getResource("/legacy_tiles/vehicles/blue_car_frame_01.png").toExternalForm());
+        blueTruckImage = new Image(getClass().getResource("/legacy_tiles/vehicles/blue_truck_frame_01.png").toExternalForm());
+        pinkCarImage = new Image(getClass().getResource("/legacy_tiles/vehicles/pink_car_frame_01.png").toExternalForm());
+        turquoiseCarImage = new Image(getClass().getResource("/legacy_tiles/vehicles/turquoise_car_frame_01.png").toExternalForm());
+        carBlueImage = new Image(getClass().getResource("/map/objects/vehicles/car_blue.png").toExternalForm());
+        carBlueDarkImage = new Image(getClass().getResource("/map/objects/vehicles/car_blue_dark.png").toExternalForm());
+        carGrayImage = new Image(getClass().getResource("/map/objects/vehicles/car_gray.png").toExternalForm());
+        carGreenImage = new Image(getClass().getResource("/map/objects/vehicles/car_green.png").toExternalForm());
+        carOrangeImage = new Image(getClass().getResource("/map/objects/vehicles/car_orange.png").toExternalForm());
+        carRedImage = new Image(getClass().getResource("/map/objects/vehicles/car_red.png").toExternalForm());
+        carSportsRedImage = new Image(getClass().getResource("/map/objects/vehicles/car_sports_red.png").toExternalForm());
+        carTealImage = new Image(getClass().getResource("/map/objects/vehicles/car_teal.png").toExternalForm());
+        carWhiteImage = new Image(getClass().getResource("/map/objects/vehicles/car_white.png").toExternalForm());
+        carYellowImage = new Image(getClass().getResource("/map/objects/vehicles/car_yellow.png").toExternalForm());
+        constructionVehImage = new Image(getClass().getResource("/map/objects/vehicles/car_blue.png").toExternalForm());
+        helicopterImage = new Image(getClass().getResource("/map/objects/vehicles/helicopter.png").toExternalForm());
+        breakdownTruckImage = new Image(getClass().getResource("/legacy_tiles/vehicles/breakdown_truck_frame_01.png").toExternalForm());
+        bugImage = new Image(getClass().getResource("/legacy_tiles/vehicles/bug_frame_01.png").toExternalForm());
+        coachImage = new Image(getClass().getResource("/legacy_tiles/vehicles/coach_frame_01.png").toExternalForm());
+        cossieImage = new Image(getClass().getResource("/legacy_tiles/vehicles/cossie_frame_01.png").toExternalForm());
+        fourXFourImage = new Image(getClass().getResource("/legacy_tiles/vehicles/four_x_four_frame_01.png").toExternalForm());
+        counthashImage = new Image(getClass().getResource("/legacy_tiles/vehicles/counthash_frame_01.png").toExternalForm());
+        jugularImage = new Image(getClass().getResource("/legacy_tiles/vehicles/jugular_frame_01.png").toExternalForm());
+        mundanoImage = new Image(getClass().getResource("/legacy_tiles/vehicles/mundano_frame_01.png").toExternalForm());
+        penetratorImage = new Image(getClass().getResource("/legacy_tiles/vehicles/penetrator_frame_01.png").toExternalForm());
+        pickUpImage = new Image(getClass().getResource("/legacy_tiles/vehicles/pickup_frame_01.png").toExternalForm());
+        porkaTurboImage = new Image(getClass().getResource("/legacy_tiles/vehicles/porka_turbo_frame_01.png").toExternalForm());
+        repairVanImage = new Image(getClass().getResource("/legacy_tiles/vehicles/repair_van_frame_01.png").toExternalForm());
+        stallionImage = new Image(getClass().getResource("/legacy_tiles/vehicles/stallion_frame_01.png").toExternalForm());
+        trainImage = new Image(getClass().getResource("/legacy_tiles/vehicles/train_frame_01.png").toExternalForm());
+        tramImage = new Image(getClass().getResource("/legacy_tiles/vehicles/tram_frame_01.png").toExternalForm());
 
         playerUpIdle = new Image(
                 getClass().getResource("/legacy_tiles/characters/player/up/player_up_idle_1.png").toExternalForm()
@@ -1412,15 +1740,27 @@ public class Main extends Application {
             );
         }
 
-        trafficCarImage = taxiImage;
+        System.out.println("Red: " + redCarImage.isError());
+        System.out.println("Blue: " + blueCarImage.isError());
+        System.out.println("Truck: " + blueTruckImage.isError());
+        System.out.println("Pink: " + pinkCarImage.isError());
+        System.out.println("Turquoise: " + turquoiseCarImage.isError());
 
-        carViews[0] = new ImageView(taxiImage);
+        carViews[0] = new ImageView(redCarImage);
         carViews[0].setSmooth(false);
 
         player = new ImageView(playerDownIdle);
         player.setSmooth(false);
 
         for (int i = 0; i < npcs.length; i++) {
+
+            npcMarkers[i] = new Circle(12);
+            npcMarkers[i].setFill(Color.rgb(180, 25, 25));
+            npcMarkers[i].setOpacity(0);
+            npcMarkers[i].setMouseTransparent(true);
+
+            root.getChildren().add(npcMarkers[i]);
+
             npcs[i] = new ImageView(npcDownIdle);
             npcs[i].setSmooth(false);
             root.getChildren().add(npcs[i]);
@@ -1431,14 +1771,69 @@ public class Main extends Application {
         root.getChildren().add(player);
         root.getChildren().add(foregroundWorld);
 
-        // player's hitbox visuality
-//        playerHitboxVisual.setFill(javafx.scene.paint.Color.rgb(0, 0, 0, 1));
-//        root.getChildren().add(playerHitboxVisual);
+        // Add parked cars
+        spawnParkedCar(root, 373, 1475, blueCarImage, 0, 1.8);
+        spawnParkedCar(root, 403, 1475, pinkCarImage, 0, 1.8);
+        spawnParkedCar(root, 433, 1475, turquoiseCarImage, 0, 1.8);
+        spawnParkedCar(root, 463, 1475, blueTruckImage, 0, 1.8);
+
+        spawnParkedCar(root, 603, 1678, carBlueImage, 0, 1.2);
+        spawnParkedCar(root, 633, 1678, carBlueDarkImage, 0, 1.2);
+        spawnParkedCar(root, 663, 1678, carGreenImage, 0, 1.2);
+        spawnParkedCar(root, 693, 1678, carOrangeImage, 0, 1.2);
+        spawnParkedCar(root, 723, 1678, carRedImage, 0, 1.2);
+        spawnParkedCar(root, 753, 1678, carSportsRedImage, 0, 1.2);
+        spawnParkedCar(root, 783, 1678, carTealImage, 0, 1.2);
+        spawnParkedCar(root, 813, 1678, carYellowImage, 0, 1.2);
+        spawnParkedCar(root, 843, 1678, constructionVehImage, 0, 1.2);
+
+        spawnParkedCar(root, 233, 1050, turquoiseCarImage, 0, 1.8);
+        spawnParkedCar(root, 645, 1185, carGreenImage, 0, 1.2);
+        spawnParkedCar(root, 675, 1185, carOrangeImage, 0, 1.2);
+
+        spawnParkedCar(root, 1152, 1660, carRedImage, 0, 1.2);
+        spawnParkedCar(root, 1195, 1660, pinkCarImage, 0, 1.8);
+
+        spawnParkedCar(root, 2569, 1118, carWhiteImage, 0, 1.2);
+
+        spawnParkedCar(root, 2478, 960, constructionVehImage, 0, 1.2);
+
+        spawnParkedCar(root, 2086, 982, carSportsRedImage, 0, 1.2);
+
+        spawnParkedCar(root, 2288, 1208, turquoiseCarImage, 0, 1.8);
+        spawnParkedCar(root, 2288, 1268, carGreenImage, 0, 1.2);
+        spawnParkedCar(root, 2288, 1422, carOrangeImage, 0, 1.2);
+
+        spawnParkedCar(root, 2541, 1240, pinkCarImage, 0, 1.8);
+        spawnParkedCar(root, 2541, 1300, turquoiseCarImage, 0, 1.8);
+        spawnParkedCar(root, 2541, 1360, blueTruckImage, 0, 1.8);
+
+        spawnParkedCar(root, 936, 180, carYellowImage, 0, 1.2);
+
+        spawnParkedCar(root, 2362, 479, blueTruckImage, 0, 1.8);
+
+        spawnParkedCar(root, 81, 1509, carTealImage, 0, 1.2);
+
+        spawnParkedCar(root, 1688, 719, helicopterImage, 0, 1.2);
+
+        playerHitboxVisual.setFill(javafx.scene.paint.Color.rgb(128, 0, 128, 0.5));
+        root.getChildren().add(playerHitboxVisual);
+
+        if (editorMode) {
+            playerHitboxVisual.setVisible(true);
+        } else {
+            playerHitboxVisual.setVisible(false);
+        }
 
         player.setX(playerObject.getWorldX());
         player.setY(playerObject.getWorldY());
 
-        for (int i = 0; i < npcs.length; i++) {
+        for (int i = 0; i < npcObjects.length; i++) {
+
+            if (npcObjects[i] == null) {
+                continue;
+            }
+
             npcs[i].setX(npcObjects[i].getWorldX());
             npcs[i].setY(npcObjects[i].getWorldY());
         }
@@ -1480,6 +1875,33 @@ public class Main extends Application {
         timer.start();
     }
 
+    //******** METHODS ********
+    private Car getCurrentCar() {
+
+        if (currentCar == 0) {
+            return cars[0];
+        }
+
+        if (currentCar > 0) {
+            return trafficCars.get(currentCar - 1);
+        }
+
+        return parkedCars.get(-currentCar - 1);
+    }
+
+    private ImageView getCurrentCarView() {
+
+        if (currentCar == 0) {
+            return carViews[0];
+        }
+
+        if (currentCar > 0) {
+            return trafficCarViews.get(currentCar - 1);
+        }
+
+        return parkedCarViews.get(-currentCar - 1);
+    }
+
     public static void scale(ImageView object, double ratio) {
         object.setScaleX(ratio);
         object.setScaleY(ratio);
@@ -1490,56 +1912,112 @@ public class Main extends Application {
         name.setScaleY(ratio);
     }
 
-    private void spawnTrafficCar(Pane root) {
+    private void spawnTrafficCar(Pane root, boolean automatic) {
 
-        // Get the currently selected route
-        List<Point2D> currentRoute =
-                trafficRoutes.get(selectedTrafficRoute);
+        int routeCount = trafficRoutes.size();
 
-        System.out.println("=== SPAWN TRAFFIC CAR ===");
-        System.out.println("Existing traffic cars: " + trafficCars.size());
-        System.out.println("Selected route: " + (selectedTrafficRoute + 1));
-        System.out.println("Waypoint count: " + currentRoute.size());
-
-        // Require at least three waypoints
-        if (currentRoute.size() < 3) {
-            capturedCoordinateText.setText(
-                    "Place at least 3 waypoints on this route first!"
-            );
-            capturedCoordinateText.setVisible(true);
+        if (routeCount == 0) {
             return;
         }
 
-        // Only allow one traffic car during our first test
-        if (!trafficCars.isEmpty()) {
-            capturedCoordinateText.setText(
-                    "A traffic car already exists!"
-            );
-            capturedCoordinateText.setVisible(true);
+        int routeIndex = selectedTrafficRoute;
+        List<Point2D> route = null;
+        int spawnIndex = -1;
+
+        int routesToCheck = automatic ? routeCount : 1;
+
+        for (int r = 0; r < routesToCheck; r++) {
+
+            int candidateRouteIndex = automatic
+                    ? (nextTrafficRouteIndex + r) % routeCount
+                    : selectedTrafficRoute;
+
+            List<Point2D> candidateRoute = trafficRoutes.get(candidateRouteIndex);
+
+            if (candidateRoute.size() < 3) {
+                continue;
+            }
+
+            for (int i = 0; i < candidateRoute.size(); i++) {
+
+                int candidateIndex = (trafficCars.size() + i)
+                        % candidateRoute.size();
+
+                Point2D candidate = candidateRoute.get(candidateIndex);
+
+                if (isTrafficSpawnPositionAvailable(candidate)) {
+                    routeIndex = candidateRouteIndex;
+                    route = new ArrayList<>(candidateRoute);
+                    spawnIndex = candidateIndex;
+                    break;
+                }
+            }
+
+            if (route != null) {
+                break;
+            }
+        }
+
+        if (route == null) {
             return;
         }
 
-        // Copy the selected route
-        List<Point2D> route = new ArrayList<>(currentRoute);
+        if (automatic) {
+            nextTrafficRouteIndex = (routeIndex + 1) % routeCount;
+        }
 
-        // Get the first waypoint
-        Point2D start = route.get(0);
+        Point2D start = route.get(spawnIndex);
+
+        // Available traffic vehicle sprites
+        Image[] vehicleImages = {
+                redCarImage,
+                blueCarImage,
+                blueTruckImage,
+                pinkCarImage,
+                breakdownTruckImage,
+                bugImage,
+                coachImage,
+                cossieImage,
+                fourXFourImage,
+                counthashImage,
+                jugularImage,
+                mundanoImage,
+                penetratorImage,
+                pickUpImage,
+                porkaTurboImage,
+                repairVanImage,
+                stallionImage,
+                trainImage,
+                tramImage
+        };
+
+        // Select one random vehicle
+        int randomIndex = (int) (Math.random() * vehicleImages.length);
+        Image selectedVehicleImage = vehicleImages[randomIndex];
+
+        System.out.println("Selected vehicle index: " + randomIndex);
+
+        // Calculate the scaled dimensions
+        double vehicleWidth = selectedVehicleImage.getWidth() * 1.8;
+        double vehicleHeight = selectedVehicleImage.getHeight() * 1.8;
 
         // Position the car so its center aligns with the waypoint
         TrafficCar trafficCar = new TrafficCar(
-                start.getX() - 23.0 / 2,
-                start.getY() - 40.0 / 2,
+                start.getX() - vehicleWidth / 2,
+                start.getY() - vehicleHeight / 2,
                 0,
                 "right",
                 "traffic"
         );
 
+        trafficCar.setTargetIndex(spawnIndex);
+
         // Create the AI controller
         TrafficController controller =
                 new TrafficController(trafficCar, route);
 
-        // Create the visual representation
-        ImageView trafficView = new ImageView(trafficCarImage);
+        // Create the vehicle's visual representation
+        ImageView trafficView = new ImageView(selectedVehicleImage);
         trafficView.setSmooth(false);
 
         scale(trafficView, 1.8);
@@ -1565,6 +2043,82 @@ public class Main extends Application {
         System.out.println("TRAFFIC CAR SUCCESSFULLY CREATED!");
     }
 
+    private void spawnParkedCar(Pane root, double x, double y, Image vehicleImage, double angle, double scaleFactor) {
+
+        TrafficCar car = new TrafficCar(x, y, 0, "right", "parked");
+        car.setAngle(angle);
+        car.setParked(true);
+
+        ImageView carView = new ImageView(vehicleImage);
+        carView.setSmooth(false);
+        scale(carView, scaleFactor);
+
+        x *= 2;
+        y *= 2;
+
+        car = new TrafficCar(
+                x, y, 0, "right", "parked"
+        );
+
+        car.setAngle(angle);
+        car.setParked(true);
+
+        carView = new ImageView(vehicleImage);
+        carView.setSmooth(false);
+
+        scale(carView, scaleFactor);
+
+        carView.setX(x);
+        carView.setY(y);
+        carView.setRotate(angle);
+
+        root.getChildren().add(
+                root.getChildren().indexOf(player), carView
+        );
+
+        parkedCars.add(car);
+        parkedCarViews.add(carView);
+    }
+
+    private void spawnDriverNPC(TrafficCar car, Pane root) {
+
+        // Get the center of the abandoned car
+        double carCenterX = car.getWorldX() + 23.0 / 2;
+        double carCenterY = car.getWorldY() + 40.0 / 2;
+
+        // Place the driver beside the car
+        double spawnX = carCenterX + 30;
+        double spawnY = carCenterY;
+
+        // Set a destination away from the car
+        double destinationX = spawnX + 150;
+        double destinationY = spawnY + 100;
+
+        NPC driver = new NPC(
+                spawnX, spawnY, 80,
+                0, 0, "escape", -1
+        );
+
+        driver.setDestination(destinationX, destinationY);
+
+        // Create the driver's visual representation
+        ImageView driverView = new ImageView(npcDownIdle);
+        driverView.setSmooth(false);
+        scale(driverView, 2);
+
+        driverView.setX(spawnX);
+        driverView.setY(spawnY);
+
+        // Add the sprite behind the player
+        root.getChildren().add(
+                root.getChildren().indexOf(player),
+                driverView
+        );
+
+        // Store the NPC and its sprite
+        driverNPCs.add(driver);
+        driverNPCViews.add(driverView);
+    }
 
     public boolean checkCollision(Rectangle player, Rectangle building) {
         double playerLeft = player.getX();
@@ -1815,6 +2369,124 @@ public class Main extends Application {
         }
 
         return false;
+    }
+
+    private void handleTrafficPlayerCollisions(double deltaTime) {
+
+        if (isDriving || editorMode) {
+            return;
+        }
+
+        for (TrafficCar trafficCar : trafficCars) {
+
+            // Ignore cars that are not controlled by traffic AI
+            if (trafficCar.isPlayerControlled() || trafficCar.isParked()) {
+                continue;
+            }
+
+            // Check whether the rotated car overlaps the player
+            if (trafficCar.intersects(playerHitbox)) {
+
+                // Calculate the center of the car
+                double carCenterX = trafficCar.getWorldX() + 23.0 / 2;
+                double carCenterY = trafficCar.getWorldY() + 40.0 / 2;
+
+                // Calculate the center of the player
+                double playerCenterX =
+                        playerHitbox.getX() + playerHitbox.getWidth() / 2;
+                double playerCenterY =
+                        playerHitbox.getY() + playerHitbox.getHeight() / 2;
+
+                // Calculate the direction away from the car
+                double dx = playerCenterX - carCenterX;
+                double dy = playerCenterY - carCenterY;
+
+                double distance = Math.sqrt(dx * dx + dy * dy);
+
+                // Prevent division by zero
+                if (distance == 0) {
+                    dx = 1;
+                    dy = 0;
+                    distance = 1;
+                }
+
+                // Push the player away
+                double pushDistance = 140 * deltaTime;
+
+                playerObject.setWorldX(
+                        playerObject.getWorldX() + (dx / distance) * pushDistance
+                );
+
+                playerObject.setWorldY(
+                        playerObject.getWorldY() + (dy / distance) * pushDistance
+                );
+
+                // Keep the hitbox synchronized with the player
+                playerHitbox.setX(
+                        playerObject.getWorldX() + HITBOX_OFFSET_X
+                );
+
+                playerHitbox.setY(
+                        playerObject.getWorldY() + HITBOX_OFFSET_Y
+                );
+
+                // Slow down the traffic car
+                trafficCar.brake(deltaTime);
+            }
+        }
+    }
+
+    private void handleTrafficCarCollisions(double deltaTime) {
+
+        for (int i = 0; i < trafficCars.size(); i++) {
+
+            TrafficCar car1 = trafficCars.get(i);
+
+            if (car1.isParked() || !car1.isPlayerControlled()) {
+                continue;
+            }
+
+            for (int j = i + 1; j < trafficCars.size(); j++) {
+
+                TrafficCar car2 = trafficCars.get(j);
+
+                if (car2.isParked() || car2.isPlayerControlled()) {
+                    continue;
+                }
+
+                // Approximate car2 with a rectangle.
+                Rectangle car2Hitbox = new Rectangle(
+                        car2.getWorldX(),
+                        car2.getWorldY(),
+                        23,
+                        40
+                );
+
+                if (car1.intersects(car2Hitbox)) {
+                    car2.brake(deltaTime);
+                }
+            }
+        }
+
+        // Handle the original player taxi separately.
+        if (isDriving && currentCar == 0) {
+
+            TrafficCar playerTaxi = null;
+
+            for (TrafficCar trafficCar : trafficCars) {
+                if (!trafficCar.isParked()
+                        && trafficCar.intersects(
+                        new Rectangle(
+                                cars[0].getWorldX(),
+                                cars[0].getWorldY(),
+                                23,
+                                40
+                        ))) {
+
+                    trafficCar.brake(deltaTime);
+                }
+            }
+        }
     }
 
     private boolean isCarInsideOcclusionZone(Car car) {
@@ -2151,6 +2823,80 @@ public class Main extends Application {
             // Update route lines
             for (Line line : trafficRouteLineVisuals.get(i)) {
                 line.setOpacity(opacity);
+            }
+        }
+    }
+
+    private boolean isTrafficSpawnPositionAvailable(Point2D position) {
+
+        // Minimum distance between traffic cars
+        double minimumDistance = 100;
+
+        // Check the position against every existing traffic car
+        for (TrafficCar existingCar : trafficCars) {
+
+            double existingX = existingCar.getWorldX() + 23.0 / 2;
+            double existingY = existingCar.getWorldY() + 40.0 / 2;
+
+            double dx = position.getX() - existingX;
+            double dy = position.getY() - existingY;
+
+            double distance = Math.sqrt(dx * dx + dy * dy);
+
+            if (distance < minimumDistance) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    private int getActiveTrafficCarCount() {
+
+        int count = 0;
+
+        for (TrafficCar car : trafficCars) {
+
+            if (!car.isPlayerControlled() && !car.isParked()) {
+                count++;
+            }
+        }
+
+        return count;
+    }
+
+    private void handlePlayerCarNPCCollisions() {
+        if (!isDriving || editorMode) {
+            return;
+        }
+
+        Car car = getCurrentCar();
+
+        double carCenterX = car.getWorldX() + 23.0 / 2;
+        double carCenterY = car.getWorldY() + 40.0 / 2;
+
+        for (NPC npc : npcObjects) {
+
+            if (npc == null || npc.isKnockedDown()) {
+                continue;
+            }
+
+            Rectangle npcHitbox = new Rectangle(
+                    npc.getWorldX(),
+                    npc.getWorldY(),
+                    32,
+                    32
+            );
+
+            if (car.intersects(npcHitbox)) {
+
+                double npcCenterX = npc.getWorldX() + 16;
+                double npcCenterY = npc.getWorldY() + 16;
+
+                double directionX = npcCenterX - carCenterX;
+                double directionY = npcCenterY - carCenterY;
+
+                npc.hitByCar(directionX, directionY);
             }
         }
     }

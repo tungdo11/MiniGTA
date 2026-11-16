@@ -15,6 +15,16 @@ public class NPC {
     private double patrolStart;
     private double patrolEnd;
 
+    private double destinationX;
+    private double destinationY;
+
+    private double pauseTimer = 0;
+    private boolean escaping = false;
+
+    private boolean knockedDown = false;
+    private double knockbackX = 0;
+    private double knockbackY = 0;
+
     public NPC(double worldX, double worldY, double speed,
                double patrolStart, double patrolEnd, String movementType, int groupId) {
         this.worldX = worldX;
@@ -37,6 +47,28 @@ public class NPC {
     }
 
     public void update(double deltaTime) {
+
+        if (knockedDown) {
+            worldX += knockbackX * deltaTime;
+            worldY += knockbackY * deltaTime;
+
+            double slowdown = 600 * deltaTime;
+
+            if (knockbackX > 0) {
+                knockbackX = Math.max(0, knockbackX - slowdown);
+            } else {
+                knockbackX = Math.min(0, knockbackX + slowdown);
+            }
+
+            if (knockbackY > 0) {
+                knockbackY = Math.max(0, knockbackY - slowdown);
+            } else {
+                knockbackY = Math.min(0, knockbackY + slowdown);
+            }
+
+            return;
+        }
+
         double movement = speed * deltaTime;
 
         if (movementType.equals("horizontal")) {
@@ -68,6 +100,36 @@ public class NPC {
 
                 if (worldY <= patrolStart) {
                     direction = "down";
+                }
+            }
+        } else if (movementType.equals("escape")) {
+
+            if (!escaping) {
+                pauseTimer += deltaTime;
+
+                if (pauseTimer >= 1.0) {
+                    escaping = true;
+                }
+
+                return;
+            }
+
+            double dx = destinationX - worldX;
+            double dy = destinationY - worldY;
+            double distance = Math.sqrt(dx * dx + dy * dy);
+
+            if (distance <= movement) {
+                worldX = destinationX;
+                worldY = destinationY;
+                speed = 0;
+            } else {
+                worldX += (dx / distance) * movement;
+                worldY += (dy / distance) * movement;
+
+                if (Math.abs(dx) > Math.abs(dy)) {
+                    direction = dx > 0 ? "right" : "left";
+                } else {
+                    direction = dy > 0 ? "down" : "up";
                 }
             }
         }
@@ -114,8 +176,46 @@ public class NPC {
         this.worldY = worldY;
     }
 
+    public void setDestination(double destinationX, double destinationY) {
+        this.destinationX = destinationX;
+        this.destinationY = destinationY;
+    }
+
     public void follow(NPC leader, double offsetX, double offsetY) {
+        if (knockedDown) {
+            return;
+        }
+
         worldX = leader.getWorldX() + offsetX;
         worldY = leader.getWorldY() + offsetY;
+    }
+
+    public boolean isEscaping() {
+        return escaping;
+    }
+
+    public boolean isMoving() {
+        return speed > 0;
+    }
+
+    public void hitByCar(double directionX, double directionY) {
+        if (knockedDown) {
+            return;
+        }
+
+        knockedDown = true;
+
+        double length = Math.sqrt(directionX * directionX + directionY * directionY);
+
+        if (length == 0) {
+            length = 1;
+        }
+
+        knockbackX = (directionX / length) * 300;
+        knockbackY = (directionY / length) * 300;
+    }
+
+    public boolean isKnockedDown() {
+        return knockedDown;
     }
 }

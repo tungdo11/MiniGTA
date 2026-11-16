@@ -338,6 +338,84 @@
             return true;
         }
 
+        public boolean intersects(Rectangle target) {
+
+            double halfWidth = HITBOX_WIDTH * SPRITE_SCALE / 2;
+            double halfHeight = HITBOX_HEIGHT * SPRITE_SCALE / 2;
+
+            double centerX = getWorldX() + SPRITE_WIDTH / 2;
+            double centerY = getWorldY() + SPRITE_HEIGHT / 2;
+
+            double radians = Math.toRadians(angle);
+
+            double cos = Math.cos(radians);
+            double sin = Math.sin(radians);
+
+            // Calculate the four corners of the rotated car
+            double[][] carCorners = {
+                    {
+                            centerX - cos * halfWidth + sin * halfHeight,
+                            centerY - sin * halfWidth - cos * halfHeight
+                    },
+                    {
+                            centerX + cos * halfWidth + sin * halfHeight,
+                            centerY + sin * halfWidth - cos * halfHeight
+                    },
+                    {
+                            centerX + cos * halfWidth - sin * halfHeight,
+                            centerY + sin * halfWidth + cos * halfHeight
+                    },
+                    {
+                            centerX - cos * halfWidth - sin * halfHeight,
+                            centerY - sin * halfWidth + cos * halfHeight
+                    }
+            };
+
+            // Calculate the four corners of the target rectangle
+            double left = target.getX();
+            double right = left + target.getWidth();
+            double top = target.getY();
+            double bottom = top + target.getHeight();
+
+            double[][] targetCorners = {
+                    {left, top},
+                    {right, top},
+                    {right, bottom},
+                    {left, bottom}
+            };
+
+            // Test the four separating axes
+            double[][] axes = {
+                    {cos, sin},
+                    {-sin, cos},
+                    {1, 0},
+                    {0, 1}
+            };
+
+            for (double[] axis : axes) {
+
+                double[] carProjection =
+                        project(carCorners, axis[0], axis[1]);
+
+                double[] targetProjection =
+                        project(targetCorners, axis[0], axis[1]);
+
+                double overlap = Math.min(
+                        carProjection[1],
+                        targetProjection[1]
+                ) - Math.max(
+                        carProjection[0],
+                        targetProjection[0]
+                );
+
+                if (overlap <= 0) {
+                    return false;
+                }
+            }
+
+            return true;
+        }
+
         public double[] getExitPosition(boolean leftSide) {
             double radians = Math.toRadians(angle);
 
@@ -366,5 +444,8 @@
 
         public void setHandbrakeActive(boolean active) {
             handbrakeActive = active;
+        }
+        public void setAngle(double angle) {
+            this.angle = angle;
         }
     }

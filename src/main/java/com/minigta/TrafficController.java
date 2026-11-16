@@ -19,6 +19,14 @@ public class TrafficController {
 
     public void update(double deltaTime) {
 
+        if (car.isPlayerControlled() || car.isParked()) {
+            return;
+        }
+
+        if (car.isPlayerControlled()) {
+            return;
+        }
+
         // Make sure the route has enough waypoints
         if (route == null || route.size() < 3) {
             return;
