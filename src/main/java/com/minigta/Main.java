@@ -109,8 +109,6 @@ public class Main extends Application {
     private double tileX = 0;
     private double tileY = 0;
 
-    private int[][] map = new int[96][144];
-
     private ImageView player;
 
     private Image playerUpIdle;
@@ -161,10 +159,6 @@ public class Main extends Application {
 
     // Traffic route editor
     private boolean trafficEditorMode = false;
-
-    private final List<Point2D> trafficWaypoints = new ArrayList<>();
-    private final List<Circle> trafficWaypointVisuals = new ArrayList<>();
-    private final List<Line> trafficRouteLines = new ArrayList<>();
 
     // Multiple traffic routes
     private final List<List<Point2D>> trafficRoutes = new ArrayList<>();
@@ -239,6 +233,7 @@ public class Main extends Application {
                 return;
             }
 
+            // Converts the mouse's Scene coordinates (screen position) into local coordinates relative to world
             Point2D mouseWorld = world.sceneToLocal(
                     event.getSceneX(),
                     event.getSceneY()
@@ -283,6 +278,7 @@ public class Main extends Application {
                 return;
             }
 
+            // Converts the mouse's Scene coordinates (screen position) into local coordinates relative to world
             Point2D mouseMap = world.sceneToLocal(
                     event.getSceneX(),
                     event.getSceneY()
@@ -292,6 +288,7 @@ public class Main extends Application {
             if (trafficEditorMode) {
 
                 // Get the currently selected route and its visual lists
+                // This retrieves the currently selected traffic route.
                 List<Point2D> currentRoute = trafficRoutes.get(selectedTrafficRoute);
 
                 List<Circle> currentMarkers = trafficRouteWaypointVisuals.get(selectedTrafficRoute);
@@ -309,6 +306,7 @@ public class Main extends Application {
                 double snappedY =
                         Math.floor(mouseMap.getY() / gridSpacing) * gridSpacing;
 
+                // Creates a waypoint using world coordinates.
                 Point2D waypoint = new Point2D(
                         snappedX * 2 + gridSpacing,
                         snappedY * 2 + gridSpacing
@@ -335,6 +333,8 @@ public class Main extends Application {
                 }
 
                 // Save the stuffs
+                // It adds the waypoint to the route and saves the route to a file.
+                //It also creates a Circle to visually represent the waypoint
                 currentRoute.add(waypoint);
                 saveTrafficRoutes();
 
@@ -377,8 +377,7 @@ public class Main extends Application {
                 // Check whether the click selects an existing occlusion zone
                 for (int i = 0; i < occlusionZoneVisuals.size(); i++) {
 
-                    if (occlusionZoneVisuals.get(i).contains(
-                            mouseMap.getX(), mouseMap.getY())) {
+                    if (occlusionZoneVisuals.get(i).contains(mouseMap.getX(), mouseMap.getY())) {
 
                         selectedOcclusionZoneIndex = i;
                         break;
@@ -577,6 +576,9 @@ public class Main extends Application {
             double currentX = mouseWorld.getX();
             double currentY = mouseWorld.getY();
 
+
+            // These calculations ensure that the rectangle always has a valid top-left position and
+            // positive width and height.
             double left = Math.min(hitboxStartX, currentX);
             double top = Math.min(hitboxStartY, currentY);
 
@@ -777,6 +779,63 @@ public class Main extends Application {
 
         root.getChildren().add(modeText);
 
+        // ==================== MINIMAP RADAR ====================
+
+        double radarWidth = 250;
+        double radarHeight = 150;
+        double radarMargin = 20;
+
+        // Main radar panel
+        Pane radarPane = new Pane();
+
+        radarPane.setPrefSize(radarWidth, radarHeight);
+
+        radarPane.setLayoutX(radarMargin);
+        radarPane.setLayoutY(scene.getHeight() - radarHeight - radarMargin);
+
+        radarPane.setMouseTransparent(true);
+
+        // Radar background
+        Rectangle radarBackground = new Rectangle(radarWidth, radarHeight);
+
+        radarBackground.setArcWidth(12);
+        radarBackground.setArcHeight(12);
+
+        radarBackground.setFill(Color.rgb(15, 20, 25, 0.9));
+        radarBackground.setStroke(Color.WHITE);
+        radarBackground.setStrokeWidth(1.5);
+
+        // Radar world layer
+        Pane radarWorld = new Pane();
+
+        radarWorld.setPrefSize(radarWidth, radarHeight);
+
+        // Keep radar content inside its boundaries
+        radarWorld.setClip(
+                new Rectangle(radarWidth, radarHeight)
+        );
+
+        // Player marker
+        Circle radarPlayer = new Circle(
+                radarWidth / 2,
+                radarHeight / 2,
+                5
+        );
+
+        radarPlayer.setFill(Color.LIMEGREEN);
+        radarPlayer.setStroke(Color.WHITE);
+        radarPlayer.setStrokeWidth(1);
+
+        // Add radar elements
+        radarPane.getChildren().addAll(
+                radarBackground,
+                radarWorld,
+                radarPlayer
+        );
+
+        // Add radar above the game world
+        root.getChildren().add(radarPane);
+
         scene.setOnKeyPressed(event -> {
             switch (event.getCode()) {
                 case W -> {
@@ -917,9 +976,7 @@ public class Main extends Application {
 
                         capturedCoordinateText.setVisible(true);
 
-                        System.out.println(
-                                "Created traffic route: " + (selectedTrafficRoute + 1)
-                        );
+                        System.out.println("Created traffic route: " + (selectedTrafficRoute + 1));
 
                         updateTrafficRouteAppearance();
 
@@ -942,16 +999,11 @@ public class Main extends Application {
                         List<Point2D> currentRoute =
                                 trafficRoutes.get(selectedTrafficRoute);
 
-                        capturedCoordinateText.setText(
-                                "Selected Route " + (selectedTrafficRoute + 1)
-                                        + " | Waypoints: " + currentRoute.size()
-                        );
+                        capturedCoordinateText.setText("Selected Route " + (selectedTrafficRoute + 1) + " | Waypoints: " + currentRoute.size());
 
                         capturedCoordinateText.setVisible(true);
 
-                        System.out.println(
-                                "Switched to traffic route: " + (selectedTrafficRoute + 1)
-                        );
+                        System.out.println("Switched to traffic route: " + (selectedTrafficRoute + 1));
 
                         event.consume();
                         updateTrafficRouteAppearance();
@@ -962,14 +1014,11 @@ public class Main extends Application {
                         if (trafficEditorMode) {
 
                             // Get the currently selected route and its visual lists
-                            List<Point2D> currentRoute =
-                                    trafficRoutes.get(selectedTrafficRoute);
+                            List<Point2D> currentRoute = trafficRoutes.get(selectedTrafficRoute);
 
-                            List<Circle> currentMarkers =
-                                    trafficRouteWaypointVisuals.get(selectedTrafficRoute);
+                            List<Circle> currentMarkers = trafficRouteWaypointVisuals.get(selectedTrafficRoute);
 
-                            List<Line> currentLines =
-                                    trafficRouteLineVisuals.get(selectedTrafficRoute);
+                            List<Line> currentLines = trafficRouteLineVisuals.get(selectedTrafficRoute);
 
                             // Only delete if the route contains waypoints
                             if (!currentRoute.isEmpty()) {
@@ -987,16 +1036,12 @@ public class Main extends Application {
 
                                 // Remove the connecting line
                                 if (!currentLines.isEmpty()) {
-                                    Line lastLine =
-                                            currentLines.remove(currentLines.size() - 1);
+                                    Line lastLine = currentLines.remove(currentLines.size() - 1);
 
                                     gridLayer.getChildren().remove(lastLine);
                                 }
 
-                                capturedCoordinateText.setText(
-                                        "Route " + (selectedTrafficRoute + 1)
-                                                + ": waypoint removed"
-                                );
+                                capturedCoordinateText.setText("Route " + (selectedTrafficRoute + 1) + ": waypoint removed");
 
                                 saveTrafficRoutes();
 
@@ -1041,6 +1086,8 @@ public class Main extends Application {
 
             @Override
             public void handle(long now) {
+
+                // `now` is the current time in nanoseconds
                 if (lastTime == 0) {
                     lastTime = now;
                     return;
@@ -1140,8 +1187,7 @@ public class Main extends Application {
 
                     if (!editorMode) {
                         for (Rectangle building : buildingHitbox) {
-                            if (building != null &&
-                                    checkCollision(playerHitbox, building)) {
+                            if (building != null && checkCollision(playerHitbox, building)) {
 
                                 playerObject.setWorldY(oldY);
                                 playerHitbox.setY(playerObject.getWorldY() + HITBOX_OFFSET_Y);
@@ -1153,9 +1199,7 @@ public class Main extends Application {
 
                 // Hide the player when inside a building's occlusion zone
                 if (!isDriving) {
-                    player.setVisible(
-                            editorMode || !isPlayerInsideOcclusionZone()
-                    );
+                    player.setVisible(editorMode || !isPlayerInsideOcclusionZone());
                 }
 
                 if (!editorMode && isDriving) {
@@ -1178,12 +1222,11 @@ public class Main extends Application {
 
                     car.move(deltaTime);
 
-// Check collisions with AI traffic cars
+                    // Check collisions with AI traffic cars
                     for (TrafficCar trafficCar : trafficCars) {
 
                         // Ignore the controlled car and parked vehicles
-                        if (trafficCar == car || trafficCar.isParked()
-                                || trafficCar.isPlayerControlled()) {
+                        if (trafficCar == car || trafficCar.isParked() || trafficCar.isPlayerControlled()) {
                             continue;
                         }
 
@@ -1248,6 +1291,177 @@ public class Main extends Application {
 
                 world.setTranslateX(-cameraX);
                 world.setTranslateY(-cameraY);
+
+                // ==================== UPDATE MINIMAP RADAR ====================
+
+                // Clear previous radar objects
+                radarWorld.getChildren().clear();
+
+                // Find the player's current world position
+                double focusX;
+                double focusY;
+
+                if (isDriving) {
+                    Car currentVehicle = getCurrentCar();
+
+                    focusX = currentVehicle.getWorldX() + 11.5;
+                    focusY = currentVehicle.getWorldY() + 20;
+                } else {
+                    focusX = playerObject.getWorldX() + 24;
+                    focusY = playerObject.getWorldY() + 24;
+                }
+
+                // Convert world distances into radar distances
+                double radarScale = 0.12;
+
+                // -------------------- BUILDINGS --------------------
+
+                for (int i = 0; i < buildingCount; i++) {
+
+                    Rectangle building = buildingHitbox[i];
+
+                    if (building == null) {
+                        continue;
+                    }
+
+                    double radarX = radarWidth / 2
+                            + (building.getX() - focusX) * radarScale;
+
+                    double radarY = radarHeight / 2
+                            + (building.getY() - focusY) * radarScale;
+
+                    double radarBuildingWidth =
+                            building.getWidth() * radarScale;
+
+                    double radarBuildingHeight =
+                            building.getHeight() * radarScale;
+
+                    // Skip buildings outside the radar
+                    if (radarX + radarBuildingWidth < 0
+                            || radarX > radarWidth
+                            || radarY + radarBuildingHeight < 0
+                            || radarY > radarHeight) {
+
+                        continue;
+                    }
+
+                    Rectangle radarBuilding = new Rectangle(
+                            radarX,
+                            radarY,
+                            radarBuildingWidth,
+                            radarBuildingHeight
+                    );
+
+                    radarBuilding.setFill(Color.rgb(120, 130, 140));
+
+                    radarWorld.getChildren().add(radarBuilding);
+                }
+
+                // -------------------- AI TRAFFIC CARS --------------------
+
+                for (TrafficCar trafficCar : trafficCars) {
+
+                    // Don't draw the vehicle currently controlled by the player
+                    if (isDriving && getCurrentCar() == trafficCar) {
+                        continue;
+                    }
+
+                    double radarX = radarWidth / 2
+                            + (trafficCar.getWorldX() + 11.5 - focusX)
+                            * radarScale;
+
+                    double radarY = radarHeight / 2
+                            + (trafficCar.getWorldY() + 20 - focusY)
+                            * radarScale;
+
+                    Rectangle radarCar = new Rectangle(
+                            radarX - 2,
+                            radarY - 3,
+                            4,
+                            6
+                    );
+
+                    radarCar.setFill(Color.YELLOW);
+
+                    radarWorld.getChildren().add(radarCar);
+                }
+
+                // -------------------- PARKED CARS --------------------
+
+                for (TrafficCar parkedCar : parkedCars) {
+
+                    if (isDriving && getCurrentCar() == parkedCar) {
+                        continue;
+                    }
+
+                    double radarX = radarWidth / 2
+                            + (parkedCar.getWorldX() + 11.5 - focusX)
+                            * radarScale;
+
+                    double radarY = radarHeight / 2
+                            + (parkedCar.getWorldY() + 20 - focusY)
+                            * radarScale;
+
+                    Rectangle radarCar = new Rectangle(
+                            radarX - 2,
+                            radarY - 3,
+                            4,
+                            6
+                    );
+
+                    radarCar.setFill(Color.LIGHTBLUE);
+
+                    radarWorld.getChildren().add(radarCar);
+                }
+
+                // Draw AI traffic cars
+                for (TrafficCar trafficCar : trafficCars) {
+
+                    // Don't draw the vehicle currently controlled by the player
+                    if (isDriving && getCurrentCar() == trafficCar) {
+                        continue;
+                    }
+
+                    double radarX = radarWidth / 2
+                            + (trafficCar.getWorldX() + 11.5 - focusX) * radarScale;
+
+                    double radarY = radarHeight / 2
+                            + (trafficCar.getWorldY() + 20 - focusY) * radarScale;
+
+                    Rectangle radarCar = new Rectangle(
+                            radarX - 2,
+                            radarY - 3,
+                            4,
+                            6
+                    );
+
+                    radarCar.setFill(Color.YELLOW);
+                    radarWorld.getChildren().add(radarCar);
+                }
+
+                // Draw parked cars
+                for (TrafficCar parkedCar : parkedCars) {
+
+                    if (isDriving && getCurrentCar() == parkedCar) {
+                        continue;
+                    }
+
+                    double radarX = radarWidth / 2
+                            + (parkedCar.getWorldX() + 11.5 - focusX) * radarScale;
+
+                    double radarY = radarHeight / 2
+                            + (parkedCar.getWorldY() + 20 - focusY) * radarScale;
+
+                    Rectangle radarCar = new Rectangle(
+                            radarX - 2,
+                            radarY - 3,
+                            4,
+                            6
+                    );
+
+                    radarCar.setFill(Color.LIGHTBLUE);
+                    radarWorld.getChildren().add(radarCar);
+                }
 
                 // Update traffic AI
                 if (!editorMode) {
@@ -1870,7 +2084,11 @@ public class Main extends Application {
         stage.setTitle("Mini GTA");
         stage.setResizable(false);
         stage.getIcons().add(logoImage);
+        // Keep the radar above all other UI elements
+        radarPane.toFront();
         stage.show();
+
+        radarPane.toFront();
 
         timer.start();
     }
