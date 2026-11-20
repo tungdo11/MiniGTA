@@ -17,13 +17,17 @@ import javafx.scene.Group;
 import javafx.scene.paint.Color;
 import javafx.scene.shape.Line;
 import javafx.geometry.Point2D;
+import javafx.animation.PauseTransition;
+import javafx.util.Duration;
+import javafx.scene.text.TextFlow;
+import javafx.scene.paint.Color;
+import javafx.scene.control.Button;
 
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.ArrayList;
-import java.lang.Math;
 
 public class Main extends Application {
 
@@ -95,8 +99,6 @@ public class Main extends Application {
 
     private Player playerObject;
 
-    private final List<MapObject> mapObjects = new ArrayList<>();
-
     // Occlusion zones
     private final List<Rectangle> occlusionZones = new ArrayList<>();
     private final List<Rectangle> occlusionZoneVisuals = new ArrayList<>();
@@ -123,6 +125,12 @@ public class Main extends Application {
 
     private ImageView[] npcs = new ImageView[50];
     private NPC[] npcObjects = new NPC[50];
+
+    private NPC frankie;
+    private ImageView frankieView;
+    private boolean frankieActive = false;
+
+    private boolean prologueStarted = false;
 
     private Circle[] npcMarkers = new Circle[50];
     private double[] npcMarkerTimers = new double[50];
@@ -184,16 +192,25 @@ public class Main extends Application {
 
     // Traffic vehicle sprites
     private Image redCarImage, blueCarImage, blueTruckImage, pinkCarImage, turquoiseCarImage, carBlueImage,
-                  carBlueDarkImage, carGrayImage, carGreenImage, carOrangeImage, carRedImage, carSportsRedImage,
-                  carTealImage, carWhiteImage, carYellowImage, constructionVehImage, vanImage, helicopterImage,
-                  fourXFourImage, breakdownTruckImage, bugImage, coachImage, cossieImage, counthashImage, italiImahe,
-                  jugularImage, mundanoImage, penetratorImage, pickUpImage, porkaTurboImage, repairVanImage, stallionImage,
-                  trainImage, tramImage;
+            carBlueDarkImage, carGrayImage, carGreenImage, carOrangeImage, carRedImage, carSportsRedImage,
+            carTealImage, carWhiteImage, carYellowImage, constructionVehImage, vanImage, helicopterImage,
+            fourXFourImage, breakdownTruckImage, bugImage, coachImage, cossieImage, counthashImage, italiImage,
+            jugularImage, mundanoImage, penetratorImage, pickUpImage, porkaTurboImage, repairVanImage, stallionImage,
+            trainImage, tramImage;
 
     private double trafficSpawnTimer = 0;
 
     private static final double TRAFFIC_SPAWN_INTERVAL = 3.0;
     private static final int MAX_TRAFFIC_CARS = 100;
+
+    private DialogueSystem dialogueSystem;
+    private boolean cutsceneActive = false;
+    private boolean gameStarted = false;
+    private boolean gamePaused = false;
+    private int destinationMarker = 0;
+
+    private boolean drugDealerReached = false;
+    private boolean dealerDialogueActive = false;
 
     @Override
     public void start(Stage stage) {
@@ -248,7 +265,7 @@ public class Main extends Application {
             coordinateText.setText(
                     String.format(
                             "World: (%.1f, %.1f) | Grid: (%d, %d)",
-                            mouseWorldX, mouseWorldY, gridX, gridY
+                            mouseWorldX * 2, mouseWorldY * 2, gridX, gridY
                     )
             );
 
@@ -659,7 +676,7 @@ public class Main extends Application {
                 return;
             }
 
-// Create a permanent copy of the preview
+            // Create a permanent copy of the preview
             Rectangle savedHitbox = new Rectangle(
                     hitboxPreview.getX(),
                     hitboxPreview.getY(),
@@ -811,16 +828,10 @@ public class Main extends Application {
         radarWorld.setPrefSize(radarWidth, radarHeight);
 
         // Keep radar content inside its boundaries
-        radarWorld.setClip(
-                new Rectangle(radarWidth, radarHeight)
-        );
+        radarWorld.setClip(new Rectangle(radarWidth, radarHeight));
 
         // Player marker
-        Circle radarPlayer = new Circle(
-                radarWidth / 2,
-                radarHeight / 2,
-                5
-        );
+        Circle radarPlayer = new Circle(radarWidth / 2, radarHeight / 2, 5);
 
         radarPlayer.setFill(Color.LIMEGREEN);
         radarPlayer.setStroke(Color.WHITE);
@@ -1087,6 +1098,14 @@ public class Main extends Application {
             @Override
             public void handle(long now) {
 
+                if (!gameStarted) {
+                    return;
+                }
+
+                if (gamePaused) {
+                    return;
+                }
+
                 // `now` is the current time in nanoseconds
                 if (lastTime == 0) {
                     lastTime = now;
@@ -1118,10 +1137,12 @@ public class Main extends Application {
                     double dy = 0;
                     double speed = editorMode ? 600 : 200;
 
-                    if (wDown) dy--;
-                    if (sDown) dy++;
-                    if (aDown) dx--;
-                    if (dDown) dx++;
+                    if (!cutsceneActive || editorMode) {
+                        if (wDown) dy--;
+                        if (sDown) dy++;
+                        if (aDown) dx--;
+                        if (dDown) dx++;
+                    }
 
                     playerObject.updateDirection(dx, dy);
 
@@ -1202,7 +1223,7 @@ public class Main extends Application {
                     player.setVisible(editorMode || !isPlayerInsideOcclusionZone());
                 }
 
-                if (!editorMode && isDriving) {
+                if (!editorMode && isDriving && !cutsceneActive) {
                     Car car = getCurrentCar();
                     car.setHandbrakeActive(handbrakeDown);
 
@@ -1324,17 +1345,13 @@ public class Main extends Application {
                         continue;
                     }
 
-                    double radarX = radarWidth / 2
-                            + (building.getX() - focusX) * radarScale;
+                    double radarX = radarWidth / 2 + (building.getX() - focusX) * radarScale;
 
-                    double radarY = radarHeight / 2
-                            + (building.getY() - focusY) * radarScale;
+                    double radarY = radarHeight / 2 + (building.getY() - focusY) * radarScale;
 
-                    double radarBuildingWidth =
-                            building.getWidth() * radarScale;
+                    double radarBuildingWidth = building.getWidth() * radarScale;
 
-                    double radarBuildingHeight =
-                            building.getHeight() * radarScale;
+                    double radarBuildingHeight = building.getHeight() * radarScale;
 
                     // Skip buildings outside the radar
                     if (radarX + radarBuildingWidth < 0
@@ -1412,6 +1429,54 @@ public class Main extends Application {
                     radarCar.setFill(Color.LIGHTBLUE);
 
                     radarWorld.getChildren().add(radarCar);
+                }
+
+                // -------------------- DESTINATION MARKER --------------------
+                // The drug dealer place, coordinate of (4190, 1244)
+                // For the Prologue, Mission 1, and Mission 2
+
+                if (destinationMarker != 0) {
+
+                    double destinationX = 0;
+                    double destinationY = 0;
+
+                    // 1 = Frankie
+                    if (destinationMarker == 1) {
+                        destinationX = frankie.getWorldX();
+                        destinationY = frankie.getWorldY();
+                    }
+
+                    // 2 = Drug dealer
+                    else if (destinationMarker == 2) {
+                        destinationX = 4190;
+                        destinationY = 1244;
+                    }
+
+                    // Calculate destination position relative to the player
+                    double dx = (destinationX - focusX) * radarScale;
+                    double dy = (destinationY - focusY) * radarScale;
+
+                    // Keep marker inside radar boundaries
+                    double halfWidth = radarWidth / 2 - 8;
+                    double halfHeight = radarHeight / 2 - 8;
+
+                    double markerScale = Math.min(1.0, Math.min(halfWidth / Math.max(Math.abs(dx), 0.0001), halfHeight / Math.max(Math.abs(dy), 0.0001)));
+
+                    double missionX = radarWidth / 2 + dx * markerScale;
+                    double missionY = radarHeight / 2 + dy * markerScale;
+
+                    Circle missionMarker = new Circle(missionX, missionY, 5);
+
+                    if (destinationMarker == 1) {
+                        missionMarker.setFill(Color.YELLOW); // Frankie, also where the mission starts
+                    } else if (destinationMarker == 2) {
+                        missionMarker.setFill(Color.RED); // Drug dealer, or the destination
+                    }
+
+                    missionMarker.setStroke(Color.WHITE);
+                    missionMarker.setStrokeWidth(1.5);
+
+                    radarWorld.getChildren().add(missionMarker);
                 }
 
                 // Draw AI traffic cars
@@ -1509,6 +1574,125 @@ public class Main extends Application {
 
                 player.setX(playerObject.getWorldX() + 8 - cameraX);
                 player.setY(playerObject.getWorldY() + 12 - cameraY);
+
+                // Update Frankie's screen position
+                if (frankieActive) {
+                    frankieView.setX(frankie.getWorldX() - cameraX);
+                    frankieView.setY(frankie.getWorldY() - cameraY);
+                }
+
+                // Check whether the player has approached Frankie
+                if (!prologueStarted && frankieActive && !isDriving) {
+                    double dx = playerObject.getWorldX() - frankie.getWorldX();
+                    double dy = playerObject.getWorldY() - frankie.getWorldY();
+
+                    double distance = Math.sqrt(dx * dx + dy * dy);
+
+                    if (distance < 70) {
+                        prologueStarted = true;
+                        cutsceneActive = true;
+
+                        dialogueSystem.startSequence(
+                                new String[][]{
+                                        {"FRANKIE", "Well, look who finally showed up! Alex! Man, I thought the cops " +
+                                                "caught you back in Liberty City. Look at you—still dressing like you're" +
+                                                " going to a funeral."},
+                                        {"ALEX", "Save the jokes, Frankie. I didn't drive all the way across the country " +
+                                                "in a car with no air conditioning just to talk about my clothes. You " +
+                                                "said you had a real job for me. Big money. Not stealing cheap cars for " +
+                                                "pocket change."},
+                                        {"FRANKIE", "Whoa, whoa, take it easy, man! Relax. Take a deep breath. Smell " +
+                                                "that? That’s Los Santos, baby. Fast money, bright sunshine, and a whole " +
+                                                "lot of dangerous people who will take you out if you aren't careful. " +
+                                                "You need to lose that bad attitude before you get yourself into real trouble."},
+                                        {"ALEX", "I’m listening. Talk."},
+                                        {"FRANKIE", "Alright, listen up. Word got out you’re back in the mix, and " +
+                                                "some heavy hitters took notice. Ever hear of Hector Vargas?"},
+                                        {"ALEX", "The guy running illegal business down at the docks? I thought he was in prison."},
+                                        {"FRANKIE", "He got out. Nobody was brave enough to testify against him in court—funny" +
+                                                " how that works, right? Anyway, Hector is back, he’s angry, and he’s taking " +
+                                                "over the city fast. Right now, he has plenty of tough guys and plenty of illegal " +
+                                                "goods to move. What he doesn't have is a getaway driver who stays calm when the " +
+                                                "police helicopters start chasing him."},
+                                        {"ALEX", "And that’s why you called me."},
+                                        {"FRANKIE", "Exactly. Everybody knows you're the best behind the wheel, Alex. Hector needs someone " +
+                                                "who can outrun the police with a trunk full of valuable cargo and make zero mistakes. " +
+                                                "The pay is crazy good. Huge cash, no questions asked."},
+                                        {"ALEX", "What’s the catch? Nobody pays that much money just for a normal driver."},
+                                        {"FRANKIE", "The catch is, if you fail, Hector doesn't just fire you—you're finished " +
+                                                "for good. Plus, rival gangs are trying to take over his territory right now, " +
+                                                "and undercover agents are watching the docks closely. If you take this job, you " +
+                                                "become a huge target."},
+                                        {"ALEX", "Sounds like a normal day at work. Where do I find him?"},
+                                        {"FRANKIE", "I just sent the location to your GPS. It's an old factory down in Cypress Flats. " +
+                                                "Knock three times on the metal door by the back entrance, and tell them Frankie " +
+                                                "sent you. And hey—stay sharp out there, alright? This city is brutal to newcomers. " +
+                                                "Don’t make me look bad for trusting you."},
+                                        {"ALEX", "Just make sure my share of the money is ready when I get back, Frankie."},
+                                        {"FRANKIE", "Yeah, yeah, get out of here before somebody sees us talking!"}
+                                },
+                                DialogueMode.CUTSCENE
+                        );
+                    }
+                }
+
+                // Check whether Alex has reached the drug dealer
+                if (destinationMarker == 2 && !drugDealerReached) {
+
+                    double dx;
+                    double dy;
+
+                    if (isDriving) {
+                        Car currentVehicle = getCurrentCar();
+
+                        dx = currentVehicle.getWorldX() + 11.5 - 4190;
+                        dy = currentVehicle.getWorldY() + 20 - 1244;
+
+                    } else {
+                        dx = playerObject.getWorldX() + 24 - 4190;
+                        dy = playerObject.getWorldY() + 24 - 1244;
+                    }
+
+                    double distance = Math.sqrt(dx * dx + dy * dy);
+
+                    if (distance < 70) {
+                        drugDealerReached = true;
+                        dealerDialogueActive = true;
+                        cutsceneActive = true;
+
+                        dialogueSystem.startSequence(
+                                new String[][]{
+                                        {"HECTOR", "So. You’re the famous driver from Liberty City. Frankie told me you were " +
+                                                "fast. He didn't tell me you looked so quiet."},
+                                        {"ALEX", "I don’t get paid to talk. I get paid to drive. Frankie said you needed " +
+                                                "someone who knows how to handle a wheel."},
+                                        {"HECTOR", "Fair enough. Let’s get straight to business, then. Look at this map, Alex. " +
+                                                "For the last five years, I built an empire in this city. I move high-value " +
+                                                "shipments across every highway, port, and back alley in Los Santos. Gold, " +
+                                                "electronics, rare goods—if it’s worth millions, it moves through my warehouses."},
+                                        {"ALEX", "Sounds like you already have everything under control. Why do you need me?"},
+                                        {"HECTOR", "Because success attracts enemies. Rival gangs are trying to hijack my trucks, " +
+                                                "and the police are blocking the main roads every single night. Last week, I " +
+                                                "lost two shipments because my drivers panicked when the sirens started wailing. " +
+                                                "They crashed, they got caught, and they cost me a fortune."},
+                                        {"ALEX", "They didn't know the streets. Or how to stay cool under pressure."},
+                                        {"HECTOR", "Exactly. Anyone can drive fast on an empty highway. I need someone who can " +
+                                                "lose five police cars in rush-hour traffic without scratching the paint. I need " +
+                                                "someone who treats a high-speed chase like a Sunday drive."},
+                                        {"ALEX", "And what’s in it for me?"},
+                                        {"HECTOR", "Ten thousand dollars for every successful delivery. Plus a bonus if you " +
+                                                "keep the cargo completely untouched. You do the job right, you’ll be rich " +
+                                                "before the end of the month."},
+                                        {"ALEX", "And if things go wrong?"},
+                                        {"HECTOR", "In my business, failure is not an option. If you get trapped, you find a way out. " +
+                                                "You never lead the cops back here, and you never talk. Simple rules. Do we have a deal?"},
+                                        {"ALEX", "You have a deal. Just point me to the car and tell me where the first drop is."},
+                                        {"HECTOR", "Waite outside. Your first job starts in ten minutes. Don’t disappoint me, Alex."}
+                                },
+                                DialogueMode.CUTSCENE
+                        );
+                    }
+                }
 
                 carViews[0].setX(cars[0].getWorldX() - cameraX);
                 carViews[0].setY(cars[0].getWorldY() - cameraY);
@@ -1831,7 +2015,8 @@ public class Main extends Application {
                     }
                 }
 
-                if (!editorMode && npcObjects[1].getGroupId() == npcObjects[2].getGroupId()) {
+                // NPC follower system
+                if (!editorMode && npcObjects[1] != null && npcObjects[2] != null && npcObjects[1].getGroupId() == npcObjects[2].getGroupId()) {
                     npcObjects[2].follow(npcObjects[1], 32, 32);
                 }
 
@@ -1849,9 +2034,9 @@ public class Main extends Application {
 
         // Setup NPCs
         // new NPC(worldX, worldY, speed, patrolStart, patrolEnd, movementType, groupId);
-        npcObjects[0] = new NPC(560, 2730, 80, 26 * 16, 42 * 16, "horizontal", 1);
-        npcObjects[1] = new NPC(850, 2730, 70, 30 * 16, 40 * 16, "vertical", 2);
-        npcObjects[2] = new NPC(1100, 2820, 60, 40 * 16, 46 * 16, "vertical", 2);
+//        npcObjects[0] = new NPC(560, 2730, 80, 26 * 16, 42 * 16, "horizontal", 1);
+//        npcObjects[1] = new NPC(850, 2730, 70, 30 * 16, 40 * 16, "vertical", 2);
+//        npcObjects[2] = new NPC(1100, 2820, 60, 40 * 16, 46 * 16, "vertical", 2);
 
         redCarImage = new Image(getClass().getResource("/legacy_tiles/vehicles/red_car_frame_01.png").toExternalForm());
         blueCarImage = new Image(getClass().getResource("/legacy_tiles/vehicles/blue_car_frame_01.png").toExternalForm());
@@ -1980,6 +2165,25 @@ public class Main extends Application {
             root.getChildren().add(npcs[i]);
         }
 
+        // ******** FRANKIE ********
+        // Create Frankie for the prologue
+        frankie = new NPC(1070, 3110, 0, 1075, 1075, "horizontal", -1);
+        destinationMarker = 1;
+
+        frankieView = new ImageView(npcLeftIdle);
+        frankieView.setSmooth(false);
+        frankieView.setX(frankie.getWorldX());
+        frankieView.setY(frankie.getWorldY());
+
+        scale(frankieView, 2);
+
+        root.getChildren().add(frankieView);
+        frankieView.setVisible(frankieActive);
+
+        // Activate Frankie for the prologue
+        frankieActive = true;
+        frankieView.setVisible(frankieActive);
+
         root.getChildren().add(carViews[0]);
 
         root.getChildren().add(player);
@@ -2084,16 +2288,168 @@ public class Main extends Application {
         stage.setTitle("Mini GTA");
         stage.setResizable(false);
         stage.getIcons().add(logoImage);
+
         // Keep the radar above all other UI elements
         radarPane.toFront();
         stage.show();
-
         radarPane.toFront();
+
+        Text instructionText = new Text("Get to the ");
+        instructionText.setFill(Color.WHITE);
+        instructionText.setStroke(Color.rgb(0, 0, 0));
+        instructionText.setStrokeWidth(0.5);
+        instructionText.setStyle("-fx-font-size: 20px;");
+
+        Text destinationText = new Text("drug dealer's place.");
+        destinationText.setFill(Color.RED);
+        destinationText.setStroke(Color.rgb(0, 0, 0));
+        destinationText.setStrokeWidth(0.5);
+        destinationText.setStyle("-fx-font-size: 20px; -fx-font-weight: bold;");
+
+        TextFlow missionInstruction = new TextFlow(
+                instructionText,
+                destinationText
+        );
+
+        missionInstruction.setLayoutX(scene.getWidth() / 2 - 110);
+        missionInstruction.setLayoutY(scene.getHeight() - 30);
+        missionInstruction.setVisible(false);
+
+        root.getChildren().add(missionInstruction);
+
+        // Start Menu
+        Pane startMenu = new Pane();
+
+        // Pause Menu
+        Pane pauseMenu = new Pane();
+        pauseMenu.setPrefSize(1280, 720);
+        pauseMenu.setStyle("-fx-background-color: rgba(0, 0, 0, 0.85);");
+
+        Text pauseTitle = new Text("PAUSED");
+        pauseTitle.setFill(Color.WHITE);
+        pauseTitle.setStyle("-fx-font-size: 64px; -fx-font-weight: bold;");
+        pauseTitle.setX(520);
+        pauseTitle.setY(250);
+
+        pauseMenu.getChildren().add(pauseTitle);
+
+        Button resumeButton = new Button("RESUME");
+        resumeButton.setLayoutX(590);
+        resumeButton.setLayoutY(380);
+        resumeButton.setPrefSize(120, 45);
+
+        resumeButton.setStyle("-fx-font-size: 18px;" + "-fx-font-weight: bold;" + "-fx-background-color: #ffffff;" + "-fx-text-fill: black;");
+
+        resumeButton.setOnAction(event -> {
+            gamePaused = false;
+            lastTime = 0;
+            pauseMenu.setVisible(false);
+        });
+
+        pauseMenu.getChildren().add(resumeButton);
+
+        pauseMenu.setVisible(false);
+
+        root.getChildren().add(pauseMenu);
+
+        startMenu.setPrefSize(1280, 720);
+        startMenu.setStyle("-fx-background-color: #151515;");
+
+        Text gameTitle = new Text("MINI GTA");
+        gameTitle.setFill(Color.WHITE);
+        gameTitle.setStyle("-fx-font-size: 64px; -fx-font-weight: bold;");
+        gameTitle.setX(490);
+        gameTitle.setY(250);
+
+        Text gameSubtitle = new Text("A TOP-DOWN OPEN WORLD");
+        gameSubtitle.setFill(Color.LIGHTGRAY);
+        gameSubtitle.setStyle("-fx-font-size: 18px;");
+        gameSubtitle.setX(490);
+        gameSubtitle.setY(290);
+
+        startMenu.getChildren().addAll(gameTitle, gameSubtitle);
+
+        Button playButton = new Button("PLAY");
+
+        playButton.setLayoutX(590);
+        playButton.setLayoutY(380);
+        playButton.setPrefSize(120, 45);
+
+        playButton.setStyle("-fx-font-size: 18px;" + "-fx-font-weight: bold;" + "-fx-background-color: #ffffff;" + "-fx-text-fill: black;");
+
+        playButton.setOnAction(event -> {
+            gameStarted = true;
+            startMenu.setVisible(false);
+        });
+
+        startMenu.getChildren().add(playButton);
+
+        // Add menu above the game
+        root.getChildren().add(startMenu);
+
+        // Creating dialogues
+        dialogueSystem = new DialogueSystem(root);
+
+        Image missionPassedImage = new Image(getClass().getResource("/mission_passed.png").toExternalForm());
+
+        ImageView missionPassedView = new ImageView(missionPassedImage);
+
+        missionPassedView.setPreserveRatio(true);
+        missionPassedView.setFitWidth(400);
+        scale(missionPassedView, 2);
+        missionPassedView.setVisible(false);
+        missionPassedView.setMouseTransparent(true);
+
+        missionPassedView.setX((scene.getWidth() - 400) / 2);
+
+        missionPassedView.setY(scene.getHeight() * 0.35);
+
+        root.getChildren().add(missionPassedView);
+
+        scene.addEventHandler(
+                javafx.scene.input.KeyEvent.KEY_PRESSED,
+                event -> {
+                    if (event.getCode() == javafx.scene.input.KeyCode.ENTER) {
+
+                        boolean sequenceFinished = dialogueSystem.advanceDialogue();
+
+                        if (sequenceFinished && cutsceneActive) {
+                            cutsceneActive = false;
+
+                            if (dealerDialogueActive) {
+                                dealerDialogueActive = false;
+                                destinationMarker = 0;
+
+                                missionPassedView.setVisible(true);
+                                missionPassedView.toFront();
+
+                                missionInstruction.setVisible(false);
+
+                                PauseTransition pause = new PauseTransition(Duration.seconds(5));
+
+                                pause.setOnFinished(e -> {
+                                    missionPassedView.setVisible(false);
+                                });
+
+                                pause.play();
+                            } else {
+                                destinationMarker = 2;
+                                missionInstruction.setVisible(true);
+                            }
+                        }
+                    }
+                    if (event.getCode() == javafx.scene.input.KeyCode.ESCAPE && gameStarted && !cutsceneActive) {
+
+                        gamePaused = !gamePaused;
+                        pauseMenu.setVisible(gamePaused);
+                    }
+                }
+        );
 
         timer.start();
     }
 
-    //******** METHODS ********
+    // ******** METHODS ********
     private Car getCurrentCar() {
 
         if (currentCar == 0) {
@@ -2146,9 +2502,7 @@ public class Main extends Application {
 
         for (int r = 0; r < routesToCheck; r++) {
 
-            int candidateRouteIndex = automatic
-                    ? (nextTrafficRouteIndex + r) % routeCount
-                    : selectedTrafficRoute;
+            int candidateRouteIndex = automatic ? (nextTrafficRouteIndex + r) % routeCount : selectedTrafficRoute;
 
             List<Point2D> candidateRoute = trafficRoutes.get(candidateRouteIndex);
 
@@ -2355,68 +2709,6 @@ public class Main extends Application {
                 && playerTop < buildingBottom;
     }
 
-    public void addBuilding(Group world, Group buildingOverlay, Image roofImage, Image wallImage, int startColumn, int startRow) {
-        for (int row = 0; row < 4; row++) {
-            for (int column = 0; column < 4; column++) {
-
-                ImageView buildingTile;
-
-                if (row < 2) {
-                    buildingTile = new ImageView(roofImage);
-                } else {
-                    buildingTile = new ImageView(wallImage);
-                }
-
-                buildingTile.setX((startColumn + column) * 16);
-                buildingTile.setY((startRow + row) * 16);
-                buildingTile.setFitWidth(16);
-                buildingTile.setFitHeight(16);
-
-                if (row < 2) {
-                    buildingOverlay.getChildren().add(buildingTile);
-                } else {
-                    world.getChildren().add(buildingTile);
-                }
-            }
-        }
-
-        Rectangle buildingCollision = new Rectangle(
-                startColumn * 16 * 2,
-                (startRow + 2) * 16 * 2,
-                4 * 16 * 2,
-                2 * 16 * 2
-        );
-
-        buildingHitbox[buildingCount] = buildingCollision;
-        buildingCount++;
-    }
-
-    public void addProp(Group world, Image image, int column, int row, int width, int height) {
-        ImageView prop = new ImageView(image);
-
-        prop.setX(column * 16 - width / 2);
-        prop.setY(row * 16 - height);
-        prop.setFitWidth(width);
-        prop.setFitHeight(height);
-
-        world.getChildren().add(prop);
-    }
-
-    public boolean carCollidesWithBuilding(Car car, Rectangle building) {
-        double centerX = car.getWorldX() + 20;
-        double centerY = car.getWorldY() + 36;
-        double radius = 24;
-
-        double closestX = Math.max(building.getX(), Math.min(centerX, building.getX() + building.getWidth()));
-
-        double closestY = Math.max(building.getY(), Math.min(centerY, building.getY() + building.getHeight()));
-
-        double distanceX = centerX - closestX;
-        double distanceY = centerY - closestY;
-
-        return distanceX * distanceX + distanceY * distanceY < radius * radius;
-    }
-
     private boolean isSafeExit(double x, double y) {
         if (x + HITBOX_OFFSET_X < 0
                 || y + HITBOX_OFFSET_Y < 0
@@ -2516,65 +2808,6 @@ public class Main extends Application {
             System.out.println("Could not load hitboxes.");
             e.printStackTrace();
         }
-    }
-
-    private void deleteSelectedHitbox(Group gridLayer) {
-        if (selectedHitboxIndex == -1) {
-            return;
-        }
-
-        int index = selectedHitboxIndex;
-
-        // Remove the visual rectangle
-        gridLayer.getChildren().remove(buildingHitboxVisual[index]);
-
-        // Shift remaining hitboxes to fill the empty position
-        for (int i = index; i < buildingCount - 1; i++) {
-            buildingHitbox[i] = buildingHitbox[i + 1];
-            buildingHitboxVisual[i] = buildingHitboxVisual[i + 1];
-        }
-
-        buildingCount--;
-
-        // Clear the last occupied position
-        buildingHitbox[buildingCount] = null;
-        buildingHitboxVisual[buildingCount] = null;
-
-        selectedHitboxIndex = -1;
-
-        // Update the save file
-        saveHitboxes();
-
-        capturedCoordinateText.setText("Hitbox deleted!");
-    }
-
-    private void placeMapObject(
-            Image image,
-            double x,
-            double y,
-            double width,
-            double height,
-            Group targetLayer,
-            double hitboxOffsetX,
-            double hitboxOffsetY,
-            double hitboxWidth,
-            double hitboxHeight
-    ) {
-        MapObject mapObject = new MapObject(
-                image,
-                x,
-                y,
-                width,
-                height,
-                2,
-                hitboxOffsetX,
-                hitboxOffsetY,
-                hitboxWidth,
-                hitboxHeight
-        );
-
-        mapObjects.add(mapObject);
-        targetLayer.getChildren().add(mapObject.getImageView());
     }
 
     private boolean isPlayerInsideOcclusionZone() {
@@ -3001,29 +3234,6 @@ public class Main extends Application {
             System.out.println("Could not load occlusion zones.");
             e.printStackTrace();
         }
-    }
-
-    private void deleteSelectedOcclusionZone(Group gridLayer) {
-
-        if (selectedOcclusionZoneIndex == -1) {
-            return;
-        }
-
-        int index = selectedOcclusionZoneIndex;
-
-        gridLayer.getChildren().remove(
-                occlusionZoneVisuals.get(index)
-        );
-
-        occlusionZoneVisuals.remove(index);
-        occlusionZones.remove(index);
-
-        selectedOcclusionZoneIndex = -1;
-
-        saveOcclusionZones();
-
-        capturedCoordinateText.setText("Occlusion zone deleted!");
-        capturedCoordinateText.setVisible(true);
     }
 
     private void updateTrafficRouteAppearance() {

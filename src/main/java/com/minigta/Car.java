@@ -75,8 +75,7 @@
 
         public void steerLeft(double deltaTime, boolean braking) {
             if (speed != 0) {
-                double effectiveTurnRate =
-                        turnRate / (1 + Math.abs(speed) / 300);
+                double effectiveTurnRate = turnRate / (1 + Math.abs(speed) / 300);
 
                 effectiveTurnRate *= grip;
 
@@ -425,11 +424,9 @@
 
             double direction = leftSide ? -1 : 1;
 
-            double exitX = getWorldX() + 23.0 / 2
-                    + sideX * direction * 45;
+            double exitX = getWorldX() + 23.0 / 2 + sideX * direction * 45;
 
-            double exitY = getWorldY() + 40.0 / 2
-                    + sideY * direction * 45;
+            double exitY = getWorldY() + 40.0 / 2 + sideY * direction * 45;
 
             return new double[]{exitX, exitY};
         }
